@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Professional Green Palette (Material 3) -->
+    <color name="md_theme_primary">#2E7D32</color>
+    <color name="md_theme_onPrimary">#FFFFFF</color>
+    <color name="md_theme_primaryContainer">#A5D6A7</color>
+    <color name="md_theme_onPrimaryContainer">#002106</color>
+
+    <color name="md_theme_secondary">#52634F</color>
+    <color name="md_theme_onSecondary">#FFFFFF</color>
+
+    <color name="md_theme_error">#BA1A1A</color>
+    <color name="md_theme_onError">#FFFFFF</color>
+
+    <color name="md_theme_background">#FCFDF6</color>
+    <color name="md_theme_onBackground">#1A1C19</color>
+    <color name="md_theme_surface">#FCFDF6</color>
+    <color name="md_theme_onSurface">#1A1C19</color>
+
+    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+
+    <!-- Compatibility Names -->
+    <color name="colorPrimary">#2E7D32</color>
+    <color name="colorPrimaryDark">#1B5E20</color>
+    <color name="colorAccent">#4CAF50</color>
+</resources>

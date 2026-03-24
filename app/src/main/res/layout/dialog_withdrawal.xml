@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Withdraw Funds"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="#1B5E20"
+        android:gravity="center"
+        android:layout_marginBottom="16dp"/>
+
+    <TextView
+        android:id="@+id/tvFeeInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Early withdrawal fee: 2.5% (min R5, max R50)"
+        android:textSize="14sp"
+        android:textColor="#FF9800"
+        android:gravity="center"
+        android:layout_marginBottom="16dp"/>
+
+    <RadioGroup
+        android:id="@+id/rgWithdrawalType"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginBottom="16dp">
+
+        <RadioButton
+            android:id="@+id/rbInstant"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Instant"
+            android:layout_marginEnd="24dp"
+            android:checked="true"/>
+
+        <RadioButton
+            android:id="@+id/rbScheduled"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Thursday (Free)"/>
+    </RadioGroup>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+        android:layout_marginBottom="20dp"
+        app:startIconDrawable="@android:drawable/ic_menu_slideshow">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etAmount"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Amount (R)"
+            android:inputType="numberDecimal"/>
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btnCancel"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="Cancel"
+            android:textColor="#666666"
+            android:backgroundTint="#F5F5F5"
+            android:layout_marginEnd="8dp"/>
+
+        <Button
+            android:id="@+id/btnConfirm"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="Withdraw"
+            android:backgroundTint="#2E7D32"
+            android:textColor="#FFFFFF"/>
+    </LinearLayout>
+
+</LinearLayout>
