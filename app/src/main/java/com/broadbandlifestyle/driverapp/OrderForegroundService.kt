@@ -23,58 +23,63 @@ class OrderForegroundService : Service() {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var apiService: DriverApiService
     private var driverId: Int = -1
-    private var isBusy: Boolean = false
+
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-
-    // Heartbeat interval: 30 seconds
-    private val heartbeatInterval = 30000L
-
-    private val heartbeatHandler = Handler(Looper.getMainLooper())
-    private val heartbeatRunnable = object : Runnable {
-        override fun run() {
-            sendHeartbeat()
-            heartbeatHandler.postDelayed(this, heartbeatInterval)
-        }
-    }
+    private var heartbeatJob: Job? = null
 
     private lateinit var locationRequest: LocationRequest
     private lateinit var locationCallback: LocationCallback
 
+    companion object {
+        const val ACTION_STOP_RINGTONE = "com.broadbandlifestyle.driverapp.STOP_RINGTONE"
+        private const val NOTIFICATION_ID = 1
+    }
+
     override fun onCreate() {
         super.onCreate()
         setupLocationRequests()
+        setupRetrofit()
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Check if we are being called just to stop the ringing
+        if (intent?.action == ACTION_STOP_RINGTONE) {
+            resetNotification()
+            return START_STICKY
+        }
+
         val newDriverId = intent?.getIntExtra("DRIVER_ID", -1) ?: -1
 
-        // Stop if different driver
         if (driverId != -1 && driverId != newDriverId) {
             stopSelf()
             return START_NOT_STICKY
         }
 
         driverId = newDriverId
-        setupRetrofit()
 
-        // Start foreground with proper type for Android 10+
         startForegroundServiceWithNotification()
 
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        if (heartbeatJob == null || heartbeatJob?.isActive == false) {
+            startHeartbeatLoop()
+        }
 
-        // Start heartbeat
-        heartbeatHandler.removeCallbacks(heartbeatRunnable)
-        heartbeatHandler.post(heartbeatRunnable)
-
-        // Start location updates
         startLocationUpdates()
 
         return START_STICKY
     }
 
+    private fun resetNotification() {
+        // This replaces the "Ringing" notification with the quiet "Online" one
+        val notification = createNotification("Driver App: Online")
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.notify(NOTIFICATION_ID, notification)
+        Log.d("OrderService", "Ringtone/Alert stopped via notification reset")
+    }
+
     private fun setupLocationRequests() {
-        locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 30000) // 30 seconds
-            .setMinUpdateDistanceMeters(50f) // Update if moved 50 meters
+        locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 30000)
+            .setMinUpdateDistanceMeters(50f)
             .build()
 
         locationCallback = object : LocationCallback() {
@@ -86,110 +91,86 @@ class OrderForegroundService : Service() {
         }
     }
 
-    private fun startForegroundServiceWithNotification() {
-        val notification = createNotification("Driver App: Online")
-
-        // For Android 10+ (API 29+), we need to specify foreground service type
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
-        } else {
-            startForeground(1, notification)
-        }
-    }
-
-    private fun startLocationUpdates() {
-        // Check permission before requesting location updates
-        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION)
-            != PackageManager.PERMISSION_GRANTED) {
-            Log.e("GPS_SERVICE", "Location permission not granted")
-            return
-        }
-
-        try {
-            fusedLocationClient.requestLocationUpdates(
-                locationRequest,
-                locationCallback,
-                Looper.getMainLooper()
-            )
-        } catch (e: SecurityException) {
-            Log.e("GPS_SERVICE", "Location permission missing: ${e.message}")
-        } catch (e: Exception) {
-            Log.e("GPS_SERVICE", "Error starting location updates: ${e.message}")
+    private fun startHeartbeatLoop() {
+        heartbeatJob = serviceScope.launch {
+            while (isActive) {
+                sendHeartbeat()
+                delay(30000)
+            }
         }
     }
 
     private fun sendHeartbeat() {
         if (driverId == -1) return
+        val sharedPref = getSharedPreferences("driver_prefs", MODE_PRIVATE)
+        val isOnline = sharedPref.getBoolean("IS_ONLINE", true)
 
-        // Use GlobalScope for heartbeat to avoid cancellation issues
-        GlobalScope.launch(Dispatchers.IO) {
-            try {
-                val sharedPref = getSharedPreferences("driver_prefs", MODE_PRIVATE)
-                val isOnline = sharedPref.getBoolean("IS_ONLINE", true)
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION)
+            == PackageManager.PERMISSION_GRANTED) {
 
-                // Get last known location with permission check
-                if (ContextCompat.checkSelfPermission(this@OrderForegroundService,
-                        android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                val heartbeatData = mapOf(
+                    "driver_id" to driverId,
+                    "current_lat" to (location?.latitude ?: 0.0),
+                    "current_lng" to (location?.longitude ?: 0.0),
+                    "is_online" to isOnline
+                )
 
-                    fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                        location?.let {
-                            val heartbeatData = mapOf(
-                                "driver_id" to driverId,
-                                "current_lat" to it.latitude,
-                                "current_lng" to it.longitude,
-                                "is_online" to isOnline
-                            )
-
-                            // Call API in a coroutine
-                            GlobalScope.launch(Dispatchers.IO) {
-                                try {
-                                    val response = apiService.sendHeartbeat(heartbeatData)
-                                    if (response.isSuccessful) {
-                                        Log.d("Heartbeat", "Heartbeat sent successfully")
-                                    } else if (response.code() == 403) {
-                                        handleInactiveAccount()
-                                    }
-                                } catch (e: Exception) {
-                                    Log.e("Heartbeat", "Failed to send heartbeat", e)
-                                }
-                            }
+                serviceScope.launch {
+                    try {
+                        val response = apiService.sendHeartbeat(heartbeatData)
+                        if (response.isSuccessful) {
+                            Log.d("Heartbeat", "Driver $driverId checked in")
+                        } else if (response.code() == 403) {
+                            handleInactiveAccount()
                         }
+                    } catch (e: Exception) {
+                        Log.e("Heartbeat", "Error: ${e.message}")
                     }
                 }
-            } catch (e: Exception) {
-                Log.e("Heartbeat", "Error in heartbeat", e)
             }
         }
     }
 
     private fun sendLocationUpdate(location: Location) {
         if (driverId == -1) return
-
         serviceScope.launch {
             try {
-                val request = LocationUpdateRequest(
-                    driverId = driverId,
-                    latitude = location.latitude,
-                    longitude = location.longitude
-                )
-                val response = apiService.updateLocation(request)
-                if (response.code() == 403) {
-                    handleInactiveAccount()
-                }
+                val request = LocationUpdateRequest(driverId, location.latitude, location.longitude)
+                apiService.updateLocation(request)
             } catch (e: Exception) {
-                Log.e("Location", "Failed to update location", e)
+                Log.e("Location", "Sync failed: ${e.message}")
             }
         }
     }
 
+    private fun startForegroundServiceWithNotification() {
+        val notification = createNotification("Driver App: Online")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
+    }
+
+    private fun startLocationUpdates() {
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED) return
+
+        try {
+            fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
+        } catch (e: Exception) {
+            Log.e("GPS_SERVICE", "Error: ${e.message}")
+        }
+    }
+
     private fun handleInactiveAccount() {
-        // Run on main thread
         Handler(Looper.getMainLooper()).post {
             Toast.makeText(this, "Account Inactive: Logging out", Toast.LENGTH_LONG).show()
             stopSelf()
-
-            val intent = Intent(this, LoginActivity::class.java)
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            val intent = Intent(this, LoginActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            }
             startActivity(intent)
         }
     }
@@ -204,23 +185,14 @@ class OrderForegroundService : Service() {
 
     private fun createNotification(content: String): Notification {
         val channelId = "driver_service_channel"
-        val channelName = "Driver Service"
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                channelId,
-                channelName,
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Driver location and status service"
-            }
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
+            val channel = NotificationChannel(channelId, "Driver Service", NotificationManager.IMPORTANCE_LOW)
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.createNotificationChannel(channel)
         }
 
-        val intent = Intent(this, MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
-            this, 0, intent,
+            this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
@@ -228,25 +200,19 @@ class OrderForegroundService : Service() {
             .setContentTitle("Broadband Lifestyle")
             .setContentText(content)
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
             .setContentIntent(pendingIntent)
+            .setOngoing(true)
             .build()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        heartbeatHandler.removeCallbacks(heartbeatRunnable)
-        try {
-            if (::locationCallback.isInitialized) {
-                fusedLocationClient.removeLocationUpdates(locationCallback)
-            }
-        } catch (e: SecurityException) {
-            Log.e("GPS_SERVICE", "Error removing location updates", e)
-        } catch (e: Exception) {
-            Log.e("GPS_SERVICE", "Error in onDestroy", e)
-        }
+        heartbeatJob?.cancel()
         serviceScope.cancel()
+        if (::locationCallback.isInitialized) {
+            fusedLocationClient.removeLocationUpdates(locationCallback)
+        }
         super.onDestroy()
     }
 }

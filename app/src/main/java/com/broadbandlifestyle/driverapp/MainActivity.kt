@@ -21,7 +21,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -117,7 +116,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         checkNotificationPermission()
         checkLocationPermission()
 
-        // START THE FOREGROUND SERVICE IMMEDIATELY
         startForegroundService()
 
         refreshAllData()
@@ -190,11 +188,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun startForegroundService() {
-        Log.d("MainActivity", "Starting OrderForegroundService for driver: $currentDriverId")
         val intent = Intent(this, OrderForegroundService::class.java)
         intent.putExtra("DRIVER_ID", currentDriverId)
 
-        // Save online status to preferences
         getSharedPreferences("driver_prefs", MODE_PRIVATE)
             .edit()
             .putBoolean("IS_ONLINE", true)
@@ -207,27 +203,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    private fun isServiceRunning(serviceClass: Class<*>): Boolean {
-        try {
-            val manager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-            val services = manager.getRunningServices(Int.MAX_VALUE)
-            for (service in services) {
-                if (serviceClass.name == service.service.className) {
-                    return true
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("MainActivity", "Error checking service: ${e.message}")
-        }
-        return false
-    }
-
     private fun setupNavigationMenu() {
         navView.setNavigationItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
-                R.id.nav_home -> {
-                    // Already on home
-                }
                 R.id.nav_profile -> {
                     val intent = Intent(this, ProfileActivity::class.java)
                     intent.putExtra("DRIVER_ID", currentDriverId)
@@ -252,24 +230,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun checkDriverStatus() {
-        Log.d("MainActivity", "checkDriverStatus called")
-
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val response = apiService.getDriverStatus(currentDriverId)
-                Log.d("MainActivity", "Status API Response: ${response.code()}")
-
                 withContext(Dispatchers.Main) {
                     if (response.isSuccessful && response.body() != null) {
                         val status = response.body()!!
-                        Log.d("MainActivity", "Driver Status: isOnline=${status.is_online}, isAvailable=${status.is_available}, minutesSinceHeartbeat=${status.minutes_since_heartbeat}")
-
                         isOnline = status.is_online
 
-                        // CRITICAL: Check if there's a pending offer even if driver is offline
                         if (status.has_pending_offer && !isShowingOfferDialog) {
-                            Log.d("MainActivity", "Driver has pending offer according to status API")
-                            // Force refresh order data to show offer
                             refreshOrderData()
                         }
 
@@ -280,19 +249,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                             txtOnlineStatus.text = "○ OFFLINE"
                             txtOnlineStatus.setTextColor(ContextCompat.getColor(this@MainActivity, android.R.color.holo_red_dark))
                         }
-
-                        // Show warning if about to go offline
-                        if (status.minutes_since_heartbeat > 25 && status.is_online) {
-                            Toast.makeText(this@MainActivity,
-                                "No activity detected. You'll be marked offline in ${30 - status.minutes_since_heartbeat} minutes.",
-                                Toast.LENGTH_LONG).show()
-                        }
-                    } else {
-                        Log.e("MainActivity", "Status API failed: ${response.code()}")
                     }
                 }
             } catch (e: Exception) {
-                Log.e("MainDebug", "Status check error: ${e.message}", e)
+                Log.e("MainDebug", "Status check error: ${e.message}")
             }
         }
     }
@@ -301,7 +261,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         val statusCheckRunnable = object : Runnable {
             override fun run() {
                 checkDriverStatus()
-                mainHandler.postDelayed(this, 60000) // Check every minute
+                mainHandler.postDelayed(this, 60000)
             }
         }
         mainHandler.post(statusCheckRunnable)
@@ -321,8 +281,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             } else {
                 Toast.makeText(this, "Google Maps app not found", Toast.LENGTH_SHORT).show()
             }
-        } else {
-            Toast.makeText(this, "Destination coordinates not available", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -367,6 +325,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 getSharedPreferences("driver_prefs", MODE_PRIVATE).edit().clear().apply()
                 stopTimer()
                 mainHandler.removeCallbacks(pollRunnable)
+
+                // Stop the service entirely on logout
+                stopService(Intent(this@MainActivity, OrderForegroundService::class.java))
+
                 startActivity(Intent(this@MainActivity, LoginActivity::class.java))
                 finish()
             }
@@ -398,7 +360,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     swipeRefresh.isRefreshing = false
-                    Log.e("MainDebug", "Profile fetch error: ${e.message}")
                 }
             }
         }
@@ -413,42 +374,29 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun refreshOrderData() {
-        Log.d("MainActivity", "refreshOrderData called - Driver ID: $currentDriverId, isOnline: $isOnline")
-
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val response = apiService.getMyCurrentAssignment(currentDriverId)
-                Log.d("MainActivity", "API Response Code: ${response.code()}")
-
                 withContext(Dispatchers.Main) {
                     if (response.isSuccessful) {
                         val order = response.body()
-                        Log.d("MainActivity", "Order received: ${order?.id}, isOffer: ${order?.isOffer}")
-
                         if (order != null) {
                             currentOrderId = order.id
                             currentOrder = order
                             if (!order.isOffer) {
-                                Log.d("MainActivity", "Displaying active order")
                                 displayActiveOrder(order)
                             } else if (order.id != lastNotifiedOrderId && !isShowingOfferDialog) {
-                                Log.d("MainActivity", "Showing order offer dialog for order: ${order.id}")
                                 lastNotifiedOrderId = order.id
                                 showOrderOfferDialog(order)
-                            } else {
-                                Log.d("MainActivity", "Not showing offer - id: ${order.id}, lastNotified: $lastNotifiedOrderId, isShowing: $isShowingOfferDialog")
                             }
                         } else {
-                            Log.d("MainActivity", "No orders available")
                             resetToIdleState()
                         }
                     } else {
-                        Log.e("MainActivity", "API Error: ${response.code()} - ${response.message()}")
                         resetToIdleState()
                     }
                 }
             } catch (e: Exception) {
-                Log.e("MAIN_DEBUG", "Error: ${e.message}", e)
                 withContext(Dispatchers.Main) { resetToIdleState() }
             }
         }
@@ -509,7 +457,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         val destLng = if (order.status.lowercase() == "accepted") order.resLng else order.lng
 
         if (destLat == null || destLng == null || destLat == 0.0) return
-
         val destination = LatLng(destLat, destLng)
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
@@ -523,13 +470,16 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun fetchAndDrawRoute(origin: LatLng, dest: LatLng) {
-        val apiKey = "AIzaSyCDCIbudU_dAlsz6QS-ssb6fENwd-_TXo4"
+        val apiKey = BuildConfig.MAPS_API_KEY
         val url = "https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${dest.latitude},${dest.longitude}&key=$apiKey"
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val response = URL(url).readText()
                 val json = JSONObject(response)
+                val status = json.getString("status")
+                if (status != "OK") return@launch
+
                 val routes = json.getJSONArray("routes")
                 if (routes.length() > 0) {
                     val points = routes.getJSONObject(0).getJSONObject("overview_polyline").getString("points")
@@ -539,12 +489,13 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                         currentPolyline?.remove()
                         currentPolyline = googleMap?.addPolyline(PolylineOptions()
                             .addAll(path)
-                            .color(Color.BLUE)
-                            .width(12f))
+                            .color(Color.parseColor("#1976D2"))
+                            .width(14f)
+                            .geodesic(true))
                     }
                 }
             } catch (e: Exception) {
-                Log.e("RouteError", "Error fetching directions: ${e.message}")
+                Log.e("RouteError", "Error: ${e.message}")
             }
         }
     }
@@ -587,10 +538,25 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private fun showOrderOfferDialog(order: OrderResponse) {
         if (isShowingOfferDialog) return
         isShowingOfferDialog = true
+
+        // 1. RINGING SOUND
+        try {
+            val notificationUri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE)
+            val r = android.media.RingtoneManager.getRingtone(applicationContext, notificationUri)
+            r.play()
+
+            val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createOneShot(1000, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                vibrator.vibrate(1000)
+            }
+        } catch (e: Exception) { Log.e("UI_FIX", "Sound error: ${e.message}") }
+
         sendOrderNotification(order.restaurantName ?: "Restaurant")
 
-        val builder = AlertDialog.Builder(this)
-            .setTitle("New Delivery Offer!")
+        val builder = AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Light_Dialog_Alert)
+            .setTitle("🚨 NEW DELIVERY OFFER")
             .setMessage("Restaurant: ${order.restaurantName}\nAccept within ${order.remainingSeconds ?: 120}s")
             .setCancelable(false)
             .setPositiveButton("ACCEPT") { _, _ -> handleOrderResponse(order.id, "accepted") }
@@ -598,6 +564,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
         currentOfferDialog = builder.create()
         currentOfferDialog?.show()
+
+        currentOfferDialog?.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.parseColor("#2E7D32"))
+        currentOfferDialog?.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.parseColor("#C62828"))
+
         startAcceptanceTimer(order.remainingSeconds ?: 120, currentOfferDialog, order.restaurantName ?: "Restaurant")
     }
 
@@ -608,6 +578,12 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 dialog?.setMessage("Restaurant: $restaurantName\nAccept within ${millisUntilFinished / 1000}s")
             }
             override fun onFinish() {
+                // STOP RINGTONE even if it expires
+                val stopIntent = Intent(this@MainActivity, OrderForegroundService::class.java).apply {
+                    action = OrderForegroundService.ACTION_STOP_RINGTONE
+                }
+                startService(stopIntent)
+
                 dialog?.dismiss()
                 isShowingOfferDialog = false
                 refreshOrderData()
@@ -620,10 +596,19 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         countDownTimer = null
     }
 
+    /**
+     * UPDATED: Now sends the STOP_RINGTONE action to the service
+     */
     private fun handleOrderResponse(orderId: Int, action: String) {
         currentOfferDialog?.dismiss()
         isShowingOfferDialog = false
         stopTimer()
+
+        // CRITICAL FIX: Stop the ringing immediately when a button is clicked
+        val stopRingtoneIntent = Intent(this, OrderForegroundService::class.java).apply {
+            this.action = OrderForegroundService.ACTION_STOP_RINGTONE
+        }
+        startService(stopRingtoneIntent)
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -635,11 +620,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 withContext(Dispatchers.Main) {
                     if (response.isSuccessful) {
                         if (action == "accepted") {
-                            Toast.makeText(this@MainActivity, "Order accepted! Navigate to restaurant.", Toast.LENGTH_LONG).show()
+                            Toast.makeText(this@MainActivity, "Order accepted!", Toast.LENGTH_LONG).show()
                         }
                         refreshOrderData()
-                    } else {
-                        Toast.makeText(this@MainActivity, "Action failed: ${response.message()}", Toast.LENGTH_SHORT).show()
                     }
                 }
             } catch (e: Exception) {
@@ -656,17 +639,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 val response = apiService.pickedUpOrder(orderId, AcceptOrderRequest(currentDriverId))
                 withContext(Dispatchers.Main) {
                     if (response.isSuccessful) {
-                        Toast.makeText(this@MainActivity, "Picked up! Navigate to customer.", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@MainActivity, "Picked up!", Toast.LENGTH_LONG).show()
                         refreshOrderData()
-                    } else {
-                        Toast.makeText(this@MainActivity, "Failed: ${response.message()}", Toast.LENGTH_SHORT).show()
                     }
                 }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@MainActivity, "Network error", Toast.LENGTH_SHORT).show()
-                }
-            }
+            } catch (e: Exception) {}
         }
     }
 
@@ -678,22 +655,16 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                     if (response.isSuccessful) {
                         AlertDialog.Builder(this@MainActivity)
                             .setTitle("Order Delivered")
-                            .setMessage("Success! The order has been marked as delivered.\n\nEarnings will be added to your wallet.")
+                            .setMessage("Earnings added to your wallet.")
                             .setPositiveButton("OK") { _, _ ->
                                 resetToIdleState()
                                 refreshAllData()
                             }
                             .setCancelable(false)
                             .show()
-                    } else {
-                        Toast.makeText(this@MainActivity, "Failed: ${response.message()}", Toast.LENGTH_SHORT).show()
                     }
                 }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@MainActivity, "Network error", Toast.LENGTH_SHORT).show()
-                }
-            }
+            } catch (e: Exception) {}
         }
     }
 
@@ -713,42 +684,28 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private fun sendOrderNotification(restaurantName: String) {
         val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
+
         val pendingIntent = PendingIntent.getActivity(
-            this, 0, intent,
+            this,
+            0,
+            intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val builder = NotificationCompat.Builder(this, ORDER_CHANNEL_ID)
+        val notification = NotificationCompat.Builder(this, ORDER_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("New Delivery Offer!")
-            .setContentText("Order from $restaurantName - Tap to accept")
+            .setContentTitle("New Offer Available")
+            .setContentText("Delivery request from $restaurantName")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_CALL) // Helps it break through Do Not Disturb
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .build()
 
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
-            NotificationManagerCompat.from(this).notify(1001, builder.build())
-        }
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        mainHandler.removeCallbacks(pollRunnable)
-        stopTimer()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        checkDriverStatus()
-        refreshOrderData()
-
-        // Ensure service is running when app comes to foreground
-        if (!isServiceRunning(OrderForegroundService::class.java)) {
-            Log.d("MainActivity", "Service not running, restarting...")
-            startForegroundService()
-        }
+        // Use the standard system NotificationManager instead of Compat
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.notify(1001, notification)
     }
 }
