@@ -4,16 +4,18 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
-import android.view.View
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.broadbandlifestyle.common.BalanceResponse
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.broadbandlifestyle.common.Constants.BASE_URL
-import com.broadbandlifestyle.common.EarningsResponse
+import com.google.android.material.bottomnavigation.BottomNavigationView
 import kotlinx.coroutines.*
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -26,12 +28,21 @@ class EarningsActivity : AppCompatActivity() {
     private lateinit var txtTotalEarnings: TextView
     private lateinit var rvEarnings: RecyclerView
     private lateinit var earningsAdapter: WeeklyEarningsAdapter
+    private lateinit var bottomNav: BottomNavigationView
+    private lateinit var swipeRefresh: SwipeRefreshLayout
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_earnings)
 
+        setupWindowInsets()
+
         currentDriverId = intent.getIntExtra("DRIVER_ID", -1)
+        if (currentDriverId == -1) {
+            currentDriverId = getSharedPreferences("user_prefs", MODE_PRIVATE).getInt("USER_ID", -1)
+        }
+
         if (currentDriverId == -1) {
             finish()
             return
@@ -40,18 +51,31 @@ class EarningsActivity : AppCompatActivity() {
         initializeViews()
         setupRetrofit()
         setupRecyclerView()
+        setupBottomNavigation()
         loadData()
+
+        swipeRefresh.setOnRefreshListener { loadData() }
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                finish()
+                navigateToDashboard()
             }
         })
+    }
+
+    private fun setupWindowInsets() {
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content)) { v, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(systemBars.left, 0, systemBars.right, 0)
+            insets
+        }
     }
 
     private fun initializeViews() {
         txtTotalEarnings = findViewById(R.id.txtTotalEarnings)
         rvEarnings = findViewById(R.id.rvEarnings)
+        bottomNav = findViewById(R.id.bottomNavigation)
+        swipeRefresh = findViewById(R.id.swipeRefresh)
     }
 
     private fun setupRecyclerView() {
@@ -63,6 +87,37 @@ class EarningsActivity : AppCompatActivity() {
         rvEarnings.adapter = earningsAdapter
     }
 
+    private fun setupBottomNavigation() {
+        bottomNav.selectedItemId = R.id.nav_earnings
+        bottomNav.setOnItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_dashboard -> {
+                    navigateToDashboard()
+                    true
+                }
+                R.id.nav_earnings -> true
+                R.id.nav_history -> {
+                    startActivity(Intent(this, HistoryActivity::class.java))
+                    finish()
+                    true
+                }
+                R.id.nav_profile -> {
+                    startActivity(Intent(this, ProfileActivity::class.java))
+                    finish()
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    private fun navigateToDashboard() {
+        val intent = Intent(this, MainActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+        startActivity(intent)
+        finish()
+    }
+
     private fun setupRetrofit() {
         val retrofit = Retrofit.Builder()
             .baseUrl(BASE_URL)
@@ -72,6 +127,7 @@ class EarningsActivity : AppCompatActivity() {
     }
 
     private fun loadData() {
+        swipeRefresh.isRefreshing = true
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val earningsDeferred = async { apiService.getDriverEarnings(currentDriverId) }
@@ -81,6 +137,7 @@ class EarningsActivity : AppCompatActivity() {
                 val balanceResponse = balanceDeferred.await()
 
                 withContext(Dispatchers.Main) {
+                    swipeRefresh.isRefreshing = false
                     if (earningsResponse.isSuccessful) {
                         earningsResponse.body()?.let { earnings ->
                             val expandableList = earnings.weeklyEarnings.map { ExpandableWeeklyEarning(it) }
@@ -95,6 +152,7 @@ class EarningsActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
+                    swipeRefresh.isRefreshing = false
                     Log.e("EarningsDebug", "Error loading data: ${e.message}")
                 }
             }

@@ -16,10 +16,12 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.broadbandlifestyle.common.Constants.BASE_URL
 import com.broadbandlifestyle.common.UpdateProfileRequest
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
+import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.textfield.TextInputEditText
@@ -43,17 +45,15 @@ class ProfileActivity : AppCompatActivity() {
     private lateinit var btnLogout: MaterialButton
     private lateinit var tvSessionInfo: TextView
     private lateinit var tvOnlineStatus: TextView
+    private lateinit var bottomNav: BottomNavigationView
+    private lateinit var swipeRefresh: SwipeRefreshLayout
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_profile)
 
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
-        }
+        setupWindowInsets()
 
         currentDriverId = intent.getIntExtra("DRIVER_ID", -1)
         if (currentDriverId == -1) {
@@ -69,6 +69,7 @@ class ProfileActivity : AppCompatActivity() {
 
         initializeViews()
         setupRetrofit()
+        setupBottomNavigation()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
         loadProfile()
@@ -77,12 +78,24 @@ class ProfileActivity : AppCompatActivity() {
 
         btnUpdateProfile.setOnClickListener { saveProfile() }
         btnLogout.setOnClickListener { showLogoutConfirmation() }
+        swipeRefresh.setOnRefreshListener { 
+            loadProfile()
+            checkDriverStatus()
+        }
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                finish()
+                navigateToDashboard()
             }
         })
+    }
+
+    private fun setupWindowInsets() {
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content)) { v, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(systemBars.left, 0, systemBars.right, 0)
+            insets
+        }
     }
 
     private fun initializeViews() {
@@ -95,6 +108,39 @@ class ProfileActivity : AppCompatActivity() {
         btnLogout = findViewById(R.id.btnLogout)
         tvSessionInfo = findViewById(R.id.tvSessionInfo)
         tvOnlineStatus = findViewById(R.id.tvOnlineStatus)
+        bottomNav = findViewById(R.id.bottomNavigation)
+        swipeRefresh = findViewById(R.id.swipeRefresh)
+    }
+
+    private fun setupBottomNavigation() {
+        bottomNav.selectedItemId = R.id.nav_profile
+        bottomNav.setOnItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_dashboard -> {
+                    navigateToDashboard()
+                    true
+                }
+                R.id.nav_earnings -> {
+                    startActivity(Intent(this, EarningsActivity::class.java))
+                    finish()
+                    true
+                }
+                R.id.nav_history -> {
+                    startActivity(Intent(this, HistoryActivity::class.java))
+                    finish()
+                    true
+                }
+                R.id.nav_profile -> true
+                else -> false
+            }
+        }
+    }
+
+    private fun navigateToDashboard() {
+        val intent = Intent(this, MainActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+        startActivity(intent)
+        finish()
     }
 
     private fun setupRetrofit() {
@@ -106,10 +152,12 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     private fun loadProfile() {
+        swipeRefresh.isRefreshing = true
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val response = apiService.getDriverProfile(currentDriverId)
                 withContext(Dispatchers.Main) {
+                    swipeRefresh.isRefreshing = false
                     if (response.isSuccessful) {
                         response.body()?.let { p ->
                             etProfileName.setText(p.fullName ?: "")
@@ -123,6 +171,7 @@ class ProfileActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
+                    swipeRefresh.isRefreshing = false
                     Log.e("ProfileDebug", "Error loading profile: ${e.message}")
                     Toast.makeText(this@ProfileActivity, "Network error", Toast.LENGTH_SHORT).show()
                 }
@@ -140,7 +189,6 @@ class ProfileActivity : AppCompatActivity() {
                         isOnline = status.is_online
                         updateOnlineButton(isOnline)
 
-                        // Update session info - safe null check
                         status.session?.let { session ->
                             if (session.active) {
                                 val hours = session.online_minutes / 60
@@ -154,20 +202,12 @@ class ProfileActivity : AppCompatActivity() {
                             tvSessionInfo.visibility = android.view.View.GONE
                         }
 
-                        // Update online status text
                         if (status.is_online) {
                             tvOnlineStatus.text = "● ONLINE"
                             tvOnlineStatus.setTextColor(ContextCompat.getColor(this@ProfileActivity, android.R.color.holo_green_dark))
                         } else {
                             tvOnlineStatus.text = "○ OFFLINE"
                             tvOnlineStatus.setTextColor(ContextCompat.getColor(this@ProfileActivity, android.R.color.holo_red_dark))
-                        }
-
-                        // Show warning if heartbeat is stale
-                        if (status.minutes_since_heartbeat > 5) {
-                            Toast.makeText(this@ProfileActivity,
-                                "Location updates are stale. Please check your connection.",
-                                Toast.LENGTH_LONG).show()
                         }
                     }
                 }
@@ -178,38 +218,22 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     private fun setupOnlineToggle() {
-        // Load current status from preferences
         isOnline = getSharedPreferences("driver_prefs", MODE_PRIVATE)
             .getBoolean("IS_ONLINE", false)
-
         updateOnlineButton(isOnline)
-
         btnToggleOnline.setOnClickListener {
-            if (isOnline) {
-                showOfflineConfirmation()
-            } else {
-                goOnline()
-            }
+            if (isOnline) showOfflineConfirmation() else goOnline()
         }
     }
 
     private fun goOnline() {
-        // Check location permission
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
             != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
-                1002
-            )
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 1002)
             return
         }
-
-        // Show loading
         btnToggleOnline.isEnabled = false
         btnToggleOnline.text = "Going Online..."
-
-        // Get current location
         fusedLocationClient.lastLocation.addOnSuccessListener { location ->
             if (location != null) {
                 toggleOnlineStatus(true, location.latitude, location.longitude)
@@ -233,9 +257,7 @@ class ProfileActivity : AppCompatActivity() {
         AlertDialog.Builder(this)
             .setTitle("Go Offline")
             .setMessage("You won't receive new delivery offers while offline. Continue?")
-            .setPositiveButton("Go Offline") { _, _ ->
-                toggleOnlineStatus(false)
-            }
+            .setPositiveButton("Go Offline") { _, _ -> toggleOnlineStatus(false) }
             .setNegativeButton("Cancel", null)
             .show()
     }
@@ -243,54 +265,24 @@ class ProfileActivity : AppCompatActivity() {
     private fun toggleOnlineStatus(online: Boolean, lat: Double? = null, lng: Double? = null) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val toggleData = mutableMapOf<String, Any>(
-                    "driver_id" to currentDriverId,
-                    "is_online" to online
-                )
-
+                val toggleData = mutableMapOf<String, Any>("driver_id" to currentDriverId, "is_online" to online)
                 if (online && lat != null && lng != null) {
                     toggleData["current_lat"] = lat
                     toggleData["current_lng"] = lng
                 }
-
                 val response = apiService.toggleOnline(toggleData)
-
                 withContext(Dispatchers.Main) {
                     if (response.isSuccessful) {
                         isOnline = online
                         updateOnlineButton(online)
-
-                        // Save status to preferences
-                        getSharedPreferences("driver_prefs", MODE_PRIVATE)
-                            .edit()
-                            .putBoolean("IS_ONLINE", online)
-                            .apply()
-
-                        val message = if (online) {
-                            "You are now online and will receive delivery offers"
-                        } else {
-                            "You are now offline. Tap 'Go Online' to receive offers"
-                        }
-                        Toast.makeText(this@ProfileActivity, message, Toast.LENGTH_LONG).show()
-
-                        // Start/stop foreground service
-                        if (online) {
-                            startForegroundService()
-                            checkDriverStatus() // Refresh status
-                        } else {
-                            stopForegroundService()
-                        }
-                    } else {
-                        val errorMsg = response.errorBody()?.string() ?: "Failed to update status"
-                        Toast.makeText(this@ProfileActivity, errorMsg, Toast.LENGTH_SHORT).show()
+                        getSharedPreferences("driver_prefs", MODE_PRIVATE).edit().putBoolean("IS_ONLINE", online).apply()
+                        if (online) startForegroundService() else stopForegroundService()
                     }
                     btnToggleOnline.isEnabled = true
                     btnToggleOnline.text = if (isOnline) "Go Offline" else "Go Online"
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Log.e("ProfileDebug", "Toggle online error: ${e.message}")
-                    Toast.makeText(this@ProfileActivity, "Network error: ${e.message}", Toast.LENGTH_SHORT).show()
                     btnToggleOnline.isEnabled = true
                     btnToggleOnline.text = if (isOnline) "Go Offline" else "Go Online"
                 }
@@ -330,33 +322,20 @@ class ProfileActivity : AppCompatActivity() {
     private fun saveProfile() {
         val phone = etProfilePhone.text?.toString() ?: ""
         val isAvailable = switchAvailable.isChecked
-
         btnUpdateProfile.isEnabled = false
         btnUpdateProfile.text = "Saving..."
-
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val response = apiService.updateProfile(
-                    UpdateProfileRequest(
-                        driverId = currentDriverId,
-                        phone = phone,
-                        isAvailable = isAvailable
-                    )
-                )
+                val response = apiService.updateProfile(UpdateProfileRequest(currentDriverId, phone, isAvailable))
                 withContext(Dispatchers.Main) {
                     btnUpdateProfile.isEnabled = true
                     btnUpdateProfile.text = "Save Changes"
-                    if (response.isSuccessful) {
-                        Toast.makeText(this@ProfileActivity, "Profile Updated", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(this@ProfileActivity, "Update failed", Toast.LENGTH_SHORT).show()
-                    }
+                    Toast.makeText(this@ProfileActivity, if(response.isSuccessful) "Profile Updated" else "Update Failed", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     btnUpdateProfile.isEnabled = true
                     btnUpdateProfile.text = "Save Changes"
-                    Toast.makeText(this@ProfileActivity, "Network error", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -364,56 +343,14 @@ class ProfileActivity : AppCompatActivity() {
 
     private fun showLogoutConfirmation() {
         AlertDialog.Builder(this)
-            .setTitle("Sign Out")
-            .setMessage("Are you sure you want to logout?")
-            .setPositiveButton("Yes, Logout") { _, _ ->
-                performLogout()
+            .setTitle("Logout")
+            .setMessage("Are you sure you want to sign out?")
+            .setPositiveButton("Logout") { _, _ ->
+                getSharedPreferences("user_prefs", MODE_PRIVATE).edit().clear().apply()
+                startActivity(Intent(this, LoginActivity::class.java))
+                finish()
             }
-            .setNegativeButton("No", null)
+            .setNegativeButton("Cancel", null)
             .show()
-    }
-
-    private fun performLogout() {
-        // Stop foreground service if running
-        stopForegroundService()
-
-        // Clear preferences
-        getSharedPreferences("driver_prefs", MODE_PRIVATE)
-            .edit()
-            .clear()
-            .apply()
-
-        getSharedPreferences("user_prefs", MODE_PRIVATE)
-            .edit()
-            .clear()
-            .apply()
-
-        // Navigate to login
-        val intent = Intent(this, LoginActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
-        finish()
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        when (requestCode) {
-            1002 -> {
-                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    goOnline()
-                } else {
-                    Toast.makeText(this, "Location permission required to go online", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        checkDriverStatus()
     }
 }
