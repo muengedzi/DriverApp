@@ -4,8 +4,9 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import android.view.WindowInsetsController
+import android.os.Build
 import android.widget.TextView
-import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -76,6 +77,14 @@ class EarningsActivity : AppCompatActivity() {
         rvEarnings = findViewById(R.id.rvEarnings)
         bottomNav = findViewById(R.id.bottomNavigation)
         swipeRefresh = findViewById(R.id.swipeRefresh)
+
+        // Set the status bar to white with dark icons for this specific screen
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.insetsController?.setSystemBarsAppearance(
+                WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS,
+                WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+            )
+        }
     }
 
     private fun setupRecyclerView() {
@@ -113,8 +122,11 @@ class EarningsActivity : AppCompatActivity() {
 
     private fun navigateToDashboard() {
         val intent = Intent(this, MainActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+        intent.putExtra("DRIVER_ID", currentDriverId)
+        // Clear backstack so the user doesn't "loop" between earnings and dashboard
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         startActivity(intent)
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
         finish()
     }
 

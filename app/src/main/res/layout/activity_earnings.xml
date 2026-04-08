@@ -1,19 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/colorSurface"
-    android:fitsSystemWindows="true">
+    android:background="#F8F9FA">
 
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="?attr/colorSurface"
-        app:title="My Earnings"
+        android:background="@android:color/white"
+        app:title="Earnings"
         app:titleCentered="true"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent"
+        app:titleTextAppearance="@style/TextAppearance.Material3.TitleMedium"/>
 
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefresh"
@@ -31,15 +32,15 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="24dp"
-                android:gravity="center_horizontal">
+                android:padding="20dp">
 
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    style="@style/Widget.Material3.CardView.Filled"
-                    app:cardCornerRadius="28dp"
-                    android:layout_marginBottom="24dp">
+                    app:cardCornerRadius="24dp"
+                    app:cardElevation="4dp"
+                    app:cardBackgroundColor="#121212"
+                    android:layout_marginBottom="32dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -51,37 +52,75 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Available Balance"
-                            android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
-                            android:alpha="0.7" />
+                            android:text="Available to Cash Out"
+                            android:textColor="#B3FFFFFF"
+                            android:textSize="14sp"
+                            android:textAllCaps="true"
+                            android:letterSpacing="0.1" />
 
                         <TextView
                             android:id="@+id/txtTotalEarnings"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="R0.00"
-                            android:layout_marginTop="8dp"
-                            android:textColor="?attr/colorPrimary"
-                            android:textAppearance="@style/TextAppearance.Material3.DisplayMedium"
-                            android:textStyle="bold" />
+                            android:textColor="#FFFFFF"
+                            android:textSize="42sp"
+                            android:textStyle="bold"
+                            android:layout_marginTop="8dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnCashOut"
+                            style="@style/Widget.Material3.Button.TonalButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="24dp"
+                            android:text="Cash Out"
+                            android:textColor="#000000"
+                            app:backgroundTint="#FFFFFF"
+                            app:cornerRadius="20dp" />
 
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <TextView
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Payment History"
-                    android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
-                    android:layout_marginBottom="16dp"
-                    android:paddingStart="8dp"/>
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="16dp">
 
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/rvEarnings"
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Activity History"
+                        android:textColor="#121212"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="View All"
+                        android:textColor="?attr/colorPrimary"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:nestedScrollingEnabled="false"
-                    android:layout_marginBottom="40dp" />
+                    app:cardCornerRadius="16dp"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="#EEEEEE"
+                    app:cardElevation="0dp">
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rvEarnings"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:nestedScrollingEnabled="false" />
+                </com.google.android.material.card.MaterialCardView>
 
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
@@ -91,9 +130,9 @@
         android:id="@+id/bottomNavigation"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:menu="@menu/bottom_menu"
+        android:background="@android:color/white"
+        app:elevation="8dp"
         app:layout_constraintBottom_toBottomOf="parent"
-        android:background="?attr/colorSurface"
-        style="@style/Widget.Material3.BottomNavigationView"/>
+        app:menu="@menu/bottom_menu" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

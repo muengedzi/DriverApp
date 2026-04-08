@@ -3,16 +3,16 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/colorSurface"
-    android:fitsSystemWindows="true">
+    android:background="#F7F8FA">
 
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="?attr/colorSurface"
-        app:title="My Profile"
+        android:background="@android:color/white"
+        app:title="Profile"
         app:titleCentered="true"
+        app:titleTextAppearance="@style/TextAppearance.Material3.TitleMedium"
         app:layout_constraintTop_toTopOf="parent" />
 
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
@@ -31,79 +31,81 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="24dp"
+                android:padding="20dp"
                 android:gravity="center_horizontal">
 
                 <com.google.android.material.card.MaterialCardView
-                    android:layout_width="100dp"
-                    android:layout_height="100dp"
-                    app:cardCornerRadius="50dp"
-                    app:strokeWidth="0dp"
-                    app:cardElevation="4dp"
+                    android:layout_width="110dp"
+                    android:layout_height="110dp"
+                    app:cardCornerRadius="55dp"
+                    app:strokeWidth="3dp"
+                    app:strokeColor="@android:color/white"
+                    app:cardElevation="6dp"
+                    android:layout_marginTop="12dp"
                     android:layout_marginBottom="16dp">
                     <ImageView
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:scaleType="centerCrop"
-                        android:src="@drawable/ic_launcher_foreground" />
+                        android:src="@drawable/ic_launcher_foreground"
+                        android:background="#EEEEEE"/>
                 </com.google.android.material.card.MaterialCardView>
 
                 <TextView
                     android:id="@+id/tvOnlineStatus"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="○ OFFLINE"
-                    android:layout_marginBottom="4dp"
+                    android:text="OFFLINE"
+                    android:letterSpacing="0.1"
+                    android:textStyle="bold"
                     android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
-                    android:textColor="?attr/colorError" />
+                    android:textColor="#FF5252" />
 
                 <TextView
                     android:id="@+id/tvSessionInfo"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                    android:layout_marginTop="4dp"
+                    android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                    android:textColor="#757575"
                     android:layout_marginBottom="24dp"/>
 
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    style="@style/Widget.Material3.CardView.Filled"
-                    app:cardCornerRadius="24dp"
-                    android:layout_marginBottom="24dp">
+                    app:cardCornerRadius="20dp"
+                    app:cardElevation="0dp"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="#E0E0E0"
+                    android:layout_marginBottom="20dp">
+
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:padding="20dp"
+                        android:padding="16dp"
                         android:orientation="vertical">
 
                         <com.google.android.material.textfield.TextInputLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:hint="Full Name"
-                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                            app:boxCornerRadiusTopStart="16dp"
-                            app:boxCornerRadiusTopEnd="16dp"
-                            app:boxCornerRadiusBottomStart="16dp"
-                            app:boxCornerRadiusBottomEnd="16dp"
-                            android:layout_marginBottom="16dp">
+                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+                            app:boxStrokeColor="#000000"
+                            android:layout_marginBottom="12dp">
                             <com.google.android.material.textfield.TextInputEditText
                                 android:id="@+id/etProfileName"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:inputType="textPersonName"
-                                android:enabled="false" />
+                                android:enabled="false"
+                                android:textColor="#000000" />
                         </com.google.android.material.textfield.TextInputLayout>
 
                         <com.google.android.material.textfield.TextInputLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:hint="Phone Number"
-                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                            app:boxCornerRadiusTopStart="16dp"
-                            app:boxCornerRadiusTopEnd="16dp"
-                            app:boxCornerRadiusBottomStart="16dp"
-                            app:boxCornerRadiusBottomEnd="16dp"
-                            android:layout_marginBottom="16dp">
+                            android:hint="Mobile Number"
+                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+                            android:layout_marginBottom="12dp">
                             <com.google.android.material.textfield.TextInputEditText
                                 android:id="@+id/etProfilePhone"
                                 android:layout_width="match_parent"
@@ -114,12 +116,8 @@
                         <com.google.android.material.textfield.TextInputLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:hint="Vehicle Info"
-                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                            app:boxCornerRadiusTopStart="16dp"
-                            app:boxCornerRadiusTopEnd="16dp"
-                            app:boxCornerRadiusBottomStart="16dp"
-                            app:boxCornerRadiusBottomEnd="16dp">
+                            android:hint="Vehicle Details"
+                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense">
                             <com.google.android.material.textfield.TextInputEditText
                                 android:id="@+id/etProfileVehicle"
                                 android:layout_width="match_parent"
@@ -131,8 +129,10 @@
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    style="@style/Widget.Material3.CardView.Filled"
-                    app:cardCornerRadius="24dp"
+                    app:cardCornerRadius="20dp"
+                    app:cardElevation="0dp"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="#E0E0E0"
                     android:layout_marginBottom="24dp">
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -144,7 +144,8 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="Available for orders"
+                            android:text="Receive Delivery Orders"
+                            android:textStyle="bold"
                             android:textAppearance="@style/TextAppearance.Material3.BodyLarge"/>
                         <com.google.android.material.materialswitch.MaterialSwitch
                             android:id="@+id/switchAvailable"
@@ -156,28 +157,30 @@
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnUpdateProfile"
                     android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:text="Save Changes"
-                    app:cornerRadius="16dp"
+                    android:layout_height="54dp"
+                    android:text="Save Profile"
+                    android:textAllCaps="false"
+                    app:cornerRadius="12dp"
                     android:layout_marginBottom="12dp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnToggleOnline"
                     android:layout_width="match_parent"
-                    android:layout_height="56dp"
+                    android:layout_height="54dp"
                     android:text="Go Online"
-                    app:cornerRadius="16dp"
+                    android:textAllCaps="false"
+                    app:cornerRadius="12dp"
                     style="@style/Widget.Material3.Button.TonalButton"
                     android:layout_marginBottom="12dp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnLogout"
                     android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:text="Logout"
-                    app:cornerRadius="16dp"
+                    android:layout_height="54dp"
+                    android:text="Sign Out"
+                    android:textAllCaps="false"
                     style="@style/Widget.Material3.Button.TextButton"
-                    android:textColor="?attr/colorError"
+                    android:textColor="#FF5252"
                     android:layout_marginBottom="40dp" />
 
             </LinearLayout>
@@ -188,9 +191,9 @@
         android:id="@+id/bottomNavigation"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:menu="@menu/bottom_menu"
+        android:background="@android:color/white"
+        app:elevation="8dp"
         app:layout_constraintBottom_toBottomOf="parent"
-        android:background="?attr/colorSurface"
-        style="@style/Widget.Material3.BottomNavigationView"/>
+        app:menu="@menu/bottom_menu" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,9 +1,10 @@
 package com.broadbandlifestyle.driverapp
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import android.widget.Toast
+import android.view.WindowInsetsController
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -70,11 +71,19 @@ class HistoryActivity : AppCompatActivity() {
         rvHistory = findViewById(R.id.rvHistory)
         bottomNav = findViewById(R.id.bottomNavigation)
         rvHistory.layoutManager = LinearLayoutManager(this)
+
+        // Force Light Status Bar for white background
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.insetsController?.setSystemBarsAppearance(
+                WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS,
+                WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+            )
+        }
     }
 
     private fun setupToolbar() {
         setSupportActionBar(toolbar)
-        supportActionBar?.title = "Delivery History"
+        supportActionBar?.setDisplayShowTitleEnabled(true)
     }
 
     private fun setupBottomNavigation() {
@@ -86,13 +95,17 @@ class HistoryActivity : AppCompatActivity() {
                     true
                 }
                 R.id.nav_earnings -> {
-                    startActivity(Intent(this, EarningsActivity::class.java))
+                    val intent = Intent(this, EarningsActivity::class.java)
+                    intent.putExtra("DRIVER_ID", currentDriverId)
+                    startActivity(intent)
                     finish()
                     true
                 }
                 R.id.nav_history -> true
                 R.id.nav_profile -> {
-                    startActivity(Intent(this, ProfileActivity::class.java))
+                    val intent = Intent(this, ProfileActivity::class.java)
+                    intent.putExtra("DRIVER_ID", currentDriverId)
+                    startActivity(intent)
                     finish()
                     true
                 }
@@ -103,8 +116,11 @@ class HistoryActivity : AppCompatActivity() {
 
     private fun navigateToDashboard() {
         val intent = Intent(this, MainActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+        intent.putExtra("DRIVER_ID", currentDriverId)
+        // Clear backstack to keep the app flow linear
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         startActivity(intent)
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
         finish()
     }
 
@@ -120,7 +136,9 @@ class HistoryActivity : AppCompatActivity() {
         swipeRefresh.isRefreshing = true
         lifecycleScope.launch {
             try {
-                val response = apiService.getCompletedOrders(currentDriverId)
+                val response = withContext(Dispatchers.IO) {
+                    apiService.getCompletedOrders(currentDriverId)
+                }
                 if (response.isSuccessful) {
                     val orders = response.body() ?: emptyList()
                     rvHistory.adapter = HistoryAdapter(orders)
