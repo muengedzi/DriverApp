@@ -111,7 +111,6 @@ data class EarningsResponse(
 )
 
 // ==================== DRIVER PROFILE MODELS ====================
-// ==================== DRIVER PROFILE MODELS ====================
 data class DriverProfileResponse(
     @SerializedName("full_name") val fullName: String,
     @SerializedName("completed_deliveries") val completedDeliveries: Int,
@@ -180,10 +179,11 @@ data class WithdrawalHistory(
 data class Product(
     val id: Int,
     val name: String,
-    val description: String?, // Changed to nullable to prevent crashes if DB description is empty
+    val description: String?,
     val price: Double,
     @SerializedName("image_url") val imageUrl: String?,
-    @SerializedName("category_id") val categoryId: Int = 0 // Default to 0 if missing
+    @SerializedName("category_id") val categoryId: Int = 0,
+    @SerializedName("stock_quantity") val stockQuantity: Int = 0
 )
 
 data class CartItem(
@@ -200,8 +200,6 @@ data class CreateOrderRequest(
     @SerializedName("order_type") val order_type: String = "delivery",
     @SerializedName("cart") val cart: List<CartItem>
 )
-
-// Add to Models.kt with your other data classes
 
 data class CartCalculationResponse(
     val success: Boolean,

@@ -1,5 +1,8 @@
 package com.broadbandlifestyle.driverapp
 
+import android.graphics.Color
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -11,9 +14,7 @@ import com.broadbandlifestyle.common.CartManager
 import com.broadbandlifestyle.common.Product
 import com.bumptech.glide.Glide
 import com.google.android.material.button.MaterialButton
-import com.broadbandlifestyle.customerapp.ShopActivity
 
-// Added "val onProductAdded: () -> Unit" to the constructor
 class ProductAdapter(
     private val products: List<Product>,
     private val onProductAdded: () -> Unit
@@ -24,6 +25,10 @@ class ProductAdapter(
         val tvName: TextView = view.findViewById(R.id.tvProductName)
         val tvPrice: TextView = view.findViewById(R.id.tvProductPrice)
         val btnAdd: MaterialButton = view.findViewById(R.id.btnAddToCart)
+        val tvStockWarning: TextView = view.findViewById(R.id.tvStockWarning)
+        val outOfStockOverlay: View = view.findViewById(R.id.outOfStockOverlay)
+        val tvOutOfStockLabel: TextView = view.findViewById(R.id.tvOutOfStockLabel)
+        val layoutProductContent: View = view.findViewById(R.id.layoutProductContent)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ProductViewHolder {
@@ -44,11 +49,54 @@ class ProductAdapter(
             .centerCrop()
             .into(holder.imgProduct)
 
+        // Handle Stock UI
+        when {
+            product.stockQuantity <= 0 -> {
+                // Out of stock: greyed out
+                holder.outOfStockOverlay.visibility = View.VISIBLE
+                holder.tvOutOfStockLabel.visibility = View.VISIBLE
+                holder.tvStockWarning.visibility = View.GONE
+                
+                // Set grayscale filter to image
+                val matrix = ColorMatrix()
+                matrix.setSaturation(0f)
+                holder.imgProduct.colorFilter = ColorMatrixColorFilter(matrix)
+                holder.tvName.alpha = 0.5f
+                holder.tvPrice.alpha = 0.5f
+            }
+            product.stockQuantity < 5 -> {
+                // Low stock warning
+                holder.outOfStockOverlay.visibility = View.GONE
+                holder.tvOutOfStockLabel.visibility = View.GONE
+                holder.tvStockWarning.visibility = View.VISIBLE
+                holder.tvStockWarning.text = "Low Stock: ${product.stockQuantity} left"
+                
+                // Reset visual state
+                holder.imgProduct.colorFilter = null
+                holder.tvName.alpha = 1.0f
+                holder.tvPrice.alpha = 1.0f
+            }
+            else -> {
+                // Normal stock
+                holder.outOfStockOverlay.visibility = View.GONE
+                holder.tvOutOfStockLabel.visibility = View.GONE
+                holder.tvStockWarning.visibility = View.GONE
+                
+                // Reset visual state
+                holder.imgProduct.colorFilter = null
+                holder.tvName.alpha = 1.0f
+                holder.tvPrice.alpha = 1.0f
+            }
+        }
+
         holder.btnAdd.setOnClickListener {
             CartManager.addItem(product)
-            Toast.makeText(holder.itemView.context, "Added: ${product.name}", Toast.LENGTH_SHORT).show()
-
-            // Trigger the callback to update the ShopActivity FAB
+            val msg = if (product.stockQuantity <= 0) {
+                "Added (Backorder): ${product.name}"
+            } else {
+                "Added: ${product.name}"
+            }
+            Toast.makeText(holder.itemView.context, msg, Toast.LENGTH_SHORT).show()
             onProductAdded()
         }
     }

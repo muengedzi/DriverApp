@@ -7,6 +7,7 @@ import android.util.Log
 import android.view.WindowInsetsController
 import android.os.Build
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -15,8 +16,10 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import com.broadbandlifestyle.common.BalanceResponse
 import com.broadbandlifestyle.common.Constants.BASE_URL
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.*
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -25,12 +28,14 @@ class EarningsActivity : AppCompatActivity() {
 
     private lateinit var apiService: DriverApiService
     private var currentDriverId: Int = -1
+    private var lastBalanceInfo: BalanceResponse? = null
 
     private lateinit var txtTotalEarnings: TextView
     private lateinit var rvEarnings: RecyclerView
     private lateinit var earningsAdapter: WeeklyEarningsAdapter
     private lateinit var bottomNav: BottomNavigationView
     private lateinit var swipeRefresh: SwipeRefreshLayout
+    private lateinit var btnCashOut: MaterialButton
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -57,6 +62,19 @@ class EarningsActivity : AppCompatActivity() {
 
         swipeRefresh.setOnRefreshListener { loadData() }
 
+        btnCashOut.setOnClickListener {
+            lastBalanceInfo?.let { balance ->
+                if (balance.availableBalance > 0) {
+                    val dialog = WithdrawalDialog(this, currentDriverId, balance, apiService) {
+                        loadData() // Refresh data after successful withdrawal
+                    }
+                    dialog.show()
+                } else {
+                    Toast.makeText(this, "No funds available for withdrawal", Toast.LENGTH_SHORT).show()
+                }
+            } ?: Toast.makeText(this, "Loading balance info...", Toast.LENGTH_SHORT).show()
+        }
+
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 navigateToDashboard()
@@ -77,8 +95,8 @@ class EarningsActivity : AppCompatActivity() {
         rvEarnings = findViewById(R.id.rvEarnings)
         bottomNav = findViewById(R.id.bottomNavigation)
         swipeRefresh = findViewById(R.id.swipeRefresh)
+        btnCashOut = findViewById(R.id.btnCashOut)
 
-        // Set the status bar to white with dark icons for this specific screen
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.insetsController?.setSystemBarsAppearance(
                 WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS,
@@ -123,10 +141,8 @@ class EarningsActivity : AppCompatActivity() {
     private fun navigateToDashboard() {
         val intent = Intent(this, MainActivity::class.java)
         intent.putExtra("DRIVER_ID", currentDriverId)
-        // Clear backstack so the user doesn't "loop" between earnings and dashboard
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         startActivity(intent)
-        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
         finish()
     }
 
@@ -158,6 +174,7 @@ class EarningsActivity : AppCompatActivity() {
                     }
                     if (balanceResponse.isSuccessful) {
                         balanceResponse.body()?.let { balance ->
+                            lastBalanceInfo = balance
                             txtTotalEarnings.text = "R%.2f".format(balance.currentBalance)
                         }
                     }

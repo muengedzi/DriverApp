@@ -60,14 +60,8 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun setupTextWatchers() {
-        // Clear errors when user starts typing
-        etEmail.doAfterTextChanged {
-            emailLayout.error = null
-        }
-
-        etPassword.doAfterTextChanged {
-            passwordLayout.error = null
-        }
+        etEmail.doAfterTextChanged { emailLayout.error = null }
+        etPassword.doAfterTextChanged { passwordLayout.error = null }
     }
 
     private fun setupClickListeners() {
@@ -96,10 +90,7 @@ class LoginActivity : AppCompatActivity() {
         val email = etEmail.text.toString().trim()
         val password = etPassword.text.toString().trim()
 
-        // Validate inputs with Material Design error messages
-        if (!validateInputs(email, password)) {
-            return
-        }
+        if (!validateInputs(email, password)) return
 
         setLoading(true)
 
@@ -116,10 +107,7 @@ class LoginActivity : AppCompatActivity() {
                         val role = loginData.role?.trim()?.lowercase() ?: "user"
                         val userId = loginData.userId ?: -1
 
-                        // Save to SharedPreferences
                         saveUserData(userId, role)
-
-                        // Navigate based on role
                         navigateToMainApp(role, userId)
                     } else {
                         showError("Invalid login credentials")
@@ -136,37 +124,21 @@ class LoginActivity : AppCompatActivity() {
 
     private fun validateInputs(email: String, password: String): Boolean {
         var isValid = true
-
-        // Email validation
-        when {
-            TextUtils.isEmpty(email) -> {
-                emailLayout.error = "Email is required"
-                isValid = false
-            }
-            !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches() -> {
-                emailLayout.error = "Please enter a valid email address"
-                isValid = false
-            }
-            else -> {
-                emailLayout.error = null
-            }
+        if (TextUtils.isEmpty(email)) {
+            emailLayout.error = "Email is required"
+            isValid = false
+        } else if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            emailLayout.error = "Please enter a valid email address"
+            isValid = false
         }
 
-        // Password validation
-        when {
-            TextUtils.isEmpty(password) -> {
-                passwordLayout.error = "Password is required"
-                isValid = false
-            }
-            password.length < 6 -> {
-                passwordLayout.error = "Password must be at least 6 characters"
-                isValid = false
-            }
-            else -> {
-                passwordLayout.error = null
-            }
+        if (TextUtils.isEmpty(password)) {
+            passwordLayout.error = "Password is required"
+            isValid = false
+        } else if (password.length < 6) {
+            passwordLayout.error = "Password must be at least 6 characters"
+            isValid = false
         }
-
         return isValid
     }
 
@@ -176,11 +148,8 @@ class LoginActivity : AppCompatActivity() {
             putInt("USER_ID", userId)
             putString("USER_ROLE", role)
         }
-
-        // Save to driver_prefs if role is driver
         if (role == "driver") {
-            val driverPrefs = getSharedPreferences("driver_prefs", MODE_PRIVATE)
-            driverPrefs.edit {
+            getSharedPreferences("driver_prefs", MODE_PRIVATE).edit {
                 putBoolean("IS_ONLINE", true)
             }
         }
