@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Geocoder
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.widget.TextView
@@ -16,9 +17,11 @@ import com.broadbandlifestyle.common.*
 import com.broadbandlifestyle.driverapp.R
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -34,7 +37,7 @@ class CheckoutActivity : AppCompatActivity() {
     private lateinit var apiService: CustomerApiService
     private var currentUserId: Int = -1
 
-    // UI Elements for price breakdown - FIXED: Use correct IDs from layout
+    // UI Elements for price breakdown
     private lateinit var tvSubtotal: TextView
     private lateinit var tvDeliveryFee: TextView
     private lateinit var tvPlatformFee: TextView
@@ -52,7 +55,7 @@ class CheckoutActivity : AppCompatActivity() {
             return
         }
 
-        initializeViews()  // FIXED: Now initializes with correct IDs
+        initializeViews()
         setupRetrofit()
 
         val subtotal = intent.getDoubleExtra("SUBTOTAL", 0.0)
@@ -68,7 +71,6 @@ class CheckoutActivity : AppCompatActivity() {
     }
 
     private fun initializeViews() {
-        // FIXED: Use the correct IDs from activity_checkout.xml
         tvSubtotal = findViewById(R.id.tvCheckoutSubtotal)
         tvDeliveryFee = findViewById(R.id.tvCheckoutDeliveryFee)
         tvPlatformFee = findViewById(R.id.tvCheckoutPlatformFee)
@@ -86,7 +88,6 @@ class CheckoutActivity : AppCompatActivity() {
     }
 
     private fun displayPriceBreakdown(subtotal: Double, deliveryFee: Double, platformFee: Double, total: Double) {
-        // FIXED: Now properly sets text to the correct TextViews
         tvSubtotal.text = "R${String.format("%.2f", subtotal)}"
         tvDeliveryFee.text = "R${String.format("%.2f", deliveryFee)}"
         tvPlatformFee.text = "R${String.format("%.2f", platformFee)}"
@@ -97,15 +98,7 @@ class CheckoutActivity : AppCompatActivity() {
 
     private fun setupUI() {
         val tvTotalItems = findViewById<TextView>(R.id.tvTotalItems)
-        val totalPrice = intent.getDoubleExtra("TOTAL_PRICE", 0.0)
-
         tvTotalItems.text = "Total Items: ${CartManager.getCartCount()}"
-
-        // Optional: Update the total price display if needed
-        // The tvTotalPrice TextView is set to visibility="gone" in your layout, so it's hidden
-        // If you want to show it, you can uncomment below
-        // val tvTotalPrice = findViewById<TextView>(R.id.tvTotalPrice)
-        // tvTotalPrice.text = "Estimated Total: R${String.format("%.2f", totalPrice)}"
     }
 
     private fun setupRecyclerView() {
@@ -129,17 +122,7 @@ class CheckoutActivity : AppCompatActivity() {
 
         btnUseGPS.setOnClickListener {
             if (checkLocationPermissions()) {
-                try {
-                    fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                        location?.let {
-                            currentLat = it.latitude
-                            currentLng = it.longitude
-                            etAddress.setText(getAddressFromCoords(it.latitude, it.longitude))
-                        }
-                    }
-                } catch (e: SecurityException) {
-                    Toast.makeText(this, "Location permission denied", Toast.LENGTH_SHORT).show()
-                }
+                fetchLocation(btnUseGPS, etAddress)
             } else {
                 ActivityCompat.requestPermissions(
                     this,
@@ -147,6 +130,52 @@ class CheckoutActivity : AppCompatActivity() {
                     1001
                 )
             }
+        }
+    }
+
+    private fun fetchLocation(button: MaterialButton, addressField: TextInputEditText) {
+        button.isEnabled = false
+        button.text = "Fetching Location..."
+
+        try {
+            val priority = Priority.PRIORITY_HIGH_ACCURACY
+            val cts = CancellationTokenSource()
+            
+            fusedLocationClient.getCurrentLocation(priority, cts.token).addOnSuccessListener { location ->
+                button.isEnabled = true
+                button.text = "📍 Use My Current Location"
+                
+                if (location != null) {
+                    currentLat = location.latitude
+                    currentLng = location.longitude
+                    
+                    lifecycleScope.launch {
+                        val address = getAddressFromCoords(location.latitude, location.longitude)
+                        addressField.setText(address)
+                    }
+                } else {
+                    fusedLocationClient.lastLocation.addOnSuccessListener { lastLoc ->
+                        if (lastLoc != null) {
+                            currentLat = lastLoc.latitude
+                            currentLng = lastLoc.longitude
+                            lifecycleScope.launch {
+                                val address = getAddressFromCoords(lastLoc.latitude, lastLoc.longitude)
+                                addressField.setText(address)
+                            }
+                        } else {
+                            Toast.makeText(this, "Unable to get location. Is GPS on?", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+            }.addOnFailureListener {
+                button.isEnabled = true
+                button.text = "📍 Use My Current Location"
+                Toast.makeText(this, "Location error: ${it.message}", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: SecurityException) {
+            button.isEnabled = true
+            button.text = "📍 Use My Current Location"
+            Toast.makeText(this, "Permission denied", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -163,16 +192,8 @@ class CheckoutActivity : AppCompatActivity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-
-        when (requestCode) {
-            1001 -> {
-                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    Toast.makeText(this, "Location permission granted", Toast.LENGTH_SHORT).show()
-                    findViewById<MaterialButton>(R.id.btnUseGPS).performClick()
-                } else {
-                    Toast.makeText(this, "Location permission denied", Toast.LENGTH_SHORT).show()
-                }
-            }
+        if (requestCode == 1001 && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            findViewById<MaterialButton>(R.id.btnUseGPS).performClick()
         }
     }
 
@@ -194,11 +215,29 @@ class CheckoutActivity : AppCompatActivity() {
         }
     }
 
-    private fun getAddressFromCoords(lat: Double, lng: Double): String {
-        return try {
-            val geocoder = Geocoder(this, Locale.getDefault())
-            val addresses = geocoder.getFromLocation(lat, lng, 1)
-            if (!addresses.isNullOrEmpty()) addresses[0].getAddressLine(0) else "Lat: $lat, Lng: $lng"
+    private suspend fun getAddressFromCoords(lat: Double, lng: Double): String = withContext(Dispatchers.IO) {
+        try {
+            val geocoder = Geocoder(this@CheckoutActivity, Locale.getDefault())
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val result = CompletableDeferred<String>()
+                geocoder.getFromLocation(lat, lng, 1) { addresses ->
+                    if (addresses.isNotEmpty()) {
+                        result.complete(addresses[0].getAddressLine(0))
+                    } else {
+                        result.complete("Lat: $lat, Lng: $lng")
+                    }
+                }
+                result.await()
+            } else {
+                @Suppress("DEPRECATION")
+                val addresses = geocoder.getFromLocation(lat, lng, 1)
+                if (!addresses.isNullOrEmpty()) {
+                    addresses[0].getAddressLine(0)
+                } else {
+                    "Lat: $lat, Lng: $lng"
+                }
+            }
         } catch (e: Exception) {
             "Lat: $lat, Lng: $lng"
         }
