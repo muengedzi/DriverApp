@@ -3,6 +3,7 @@ package com.broadbandlifestyle.common
 import android.content.Intent
 import android.os.Bundle
 import android.text.TextUtils
+import android.util.Log
 import android.view.View
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -112,6 +113,18 @@ class LoginActivity : AppCompatActivity() {
 
                     if (response.isSuccessful && response.body() != null) {
                         val loginData = response.body()!!
+
+                        // CRITICAL DEBUG - This will show exactly what was received
+                        Log.d("Login", "========== RAW RESPONSE ==========")
+                        Log.d("Login", "Response code: ${response.code()}")
+                        Log.d("Login", "LoginData: ${loginData.toString()}")
+                        Log.d("Login", "role: ${loginData.role}")
+                        Log.d("Login", "restaurantId: ${loginData.restaurantId}")
+                        Log.d("Login", "restaurantName: ${loginData.restaurantName}")
+                        Log.d("Login", "userId: ${loginData.userId}")
+                        Log.d("Login", "driverId: ${loginData.driverId}")
+                        Log.d("Login", "===================================")
+
                         val role = loginData.role?.trim()?.lowercase() ?: "user"
                         val userId = loginData.userId ?: -1
 
@@ -151,30 +164,47 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun saveUserData(userId: Int, role: String, loginData: LoginResponse) {
+        // 1. Save general user info
         val prefs = getSharedPreferences("user_prefs", MODE_PRIVATE)
         prefs.edit {
             putInt("USER_ID", userId)
             putString("USER_ROLE", role)
         }
 
-        when (role) {
-            "driver" -> {
-                getSharedPreferences("driver_prefs", MODE_PRIVATE).edit {
-                    putBoolean("IS_ONLINE", true)
+        Log.d("Login", "========================================")
+        Log.d("Login", "Role from server: '$role'")
+        Log.d("Login", "Is restaurant role? ${isRestaurantRole(role)}")
+        Log.d("Login", "restaurantId from response: ${loginData.restaurantId}")
+        Log.d("Login", "restaurantName from response: ${loginData.restaurantName}")
+        Log.d("Login", "========================================")
+
+        // 2. Save role-specific info
+        if (isRestaurantRole(role)) {
+            val restaurantIdValue = loginData.restaurantId
+            if (restaurantIdValue != null && restaurantIdValue != -1) {
+                getSharedPreferences("restaurant_prefs", MODE_PRIVATE).edit(commit = true) {
+                    putInt("RESTAURANT_ID", restaurantIdValue)
+                    putString("RESTAURANT_NAME", loginData.restaurantName ?: "Restaurant")
                 }
+                Log.d("Login", "✅ Saved Restaurant ID: $restaurantIdValue")
+            } else {
+                Log.e("Login", "❌ ERROR: Restaurant ID was null or invalid! Value: $restaurantIdValue")
             }
-            "restaurant staff", "restaurant_owner", "restaurant_staff" -> {
-                loginData.restaurantId?.let {
-                    getSharedPreferences("restaurant_prefs", MODE_PRIVATE).edit {
-                        putInt("RESTAURANT_ID", it)
-                        putString("RESTAURANT_NAME", loginData.restaurantName)
-                    }
-                }
+        } else if (role == "driver") {
+            getSharedPreferences("driver_prefs", MODE_PRIVATE).edit {
+                putBoolean("IS_ONLINE", true)
             }
+            Log.d("Login", "Saved driver prefs")
+        } else {
+            Log.d("Login", "Role '$role' is not driver or restaurant")
         }
     }
 
     private fun navigateToMainApp(role: String, userId: Int, loginData: LoginResponse) {
+        Log.d("Login", "navigateToMainApp called with role: $role")
+        Log.d("Login", "restaurantId: ${loginData.restaurantId}")
+        Log.d("Login", "restaurantName: ${loginData.restaurantName}")
+
         val intent = when {
             role == "driver" -> {
                 Intent(this, Class.forName("com.broadbandlifestyle.driverapp.MainActivity")).apply {
@@ -182,14 +212,18 @@ class LoginActivity : AppCompatActivity() {
                     putExtra("START_SERVICE", true)
                 }
             }
-            role == "restaurant staff" || role == "restaurant_owner" || role == "restaurant_staff" -> {
+            isRestaurantRole(role) -> {
+                val restaurantIdValue = loginData.restaurantId ?: -1
+                Log.d("Login", "Starting RestaurantDashboardActivity with ID: $restaurantIdValue")
+
                 Intent(this, Class.forName("com.broadbandlifestyle.restaurantapp.RestaurantDashboardActivity")).apply {
-                    putExtra("RESTAURANT_ID", loginData.restaurantId ?: -1)
+                    putExtra("RESTAURANT_ID", restaurantIdValue)
                     putExtra("RESTAURANT_NAME", loginData.restaurantName ?: "Restaurant")
                     putExtra("USER_ID", userId)
                 }
             }
             else -> {
+                Log.d("Login", "Defaulting to ShopActivity for role: $role")
                 Intent(this, Class.forName("com.broadbandlifestyle.customerapp.ShopActivity"))
             }
         }
@@ -197,6 +231,23 @@ class LoginActivity : AppCompatActivity() {
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
         finish()
+    }
+
+    private fun isRestaurantRole(role: String): Boolean {
+        val r = role.lowercase().trim()
+        Log.d("Login", "Checking if role '$r' is a restaurant role")
+
+        // Include ALL possible restaurant role variations
+        val result = r == "restaurant owner" ||
+                r == "restaurant_staff" ||
+                r == "restaurant staff" ||
+                r == "restaurant_owner" ||
+                r == "restaurant_manager" ||
+                r == "restaurant" ||
+                r.contains("restaurant")
+
+        Log.d("Login", "Is restaurant role? $result")
+        return result
     }
 
     private fun setLoading(isLoading: Boolean) {

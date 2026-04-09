@@ -62,7 +62,8 @@ class RestaurantDashboardActivity : AppCompatActivity() {
         // If not from intent, try shared preferences
         if (restaurantId == -1) {
             val prefs = getSharedPreferences("restaurant_prefs", MODE_PRIVATE)
-            restaurantId = prefs.getInt("RESTAFFAURANT_ID", -1)
+            // Fix the key name here:
+            restaurantId = prefs.getInt("RESTAURANT_ID", -1)
             restaurantName = prefs.getString("RESTAURANT_NAME", "Restaurant") ?: "Restaurant"
         }
 

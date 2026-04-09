@@ -11,19 +11,19 @@ data class GenericResponse(
 
 data class LoginResponse(
     @SerializedName("token") val token: String?,
-    val status: String?,
+    @SerializedName("status") val status: String?,
     @SerializedName("role") val role: String?,
     @SerializedName("driver_id") val driverId: Int?,
-    @SerializedName("user_id") val remoteUserId: Int?,
+    @SerializedName("user_id") val userId: Int?,
     @SerializedName("full_name") val fullName: String?,
     @SerializedName("restaurant_id") val restaurantId: Int? = null,
     @SerializedName("restaurant_name") val restaurantName: String? = null
 ) {
-    val userId: Int? get() = driverId ?: remoteUserId
+    // This ensures we always have a userId
+    val effectiveUserId: Int get() = userId ?: driverId ?: -1
 
-    // Added for deep debugging
     override fun toString(): String {
-        return "LoginResponse(status=$status, role=$role, driverId=$driverId, name=$fullName)"
+        return "LoginResponse(status=$status, role=$role, driverId=$driverId, userId=$userId, restaurantId=$restaurantId, restaurantName=$restaurantName)"
     }
 }
 
