@@ -1,4 +1,4 @@
-package com.broadbandlifestyle.driverapp
+package com.broadbandlifestyle.common
 
 import android.content.Intent
 import android.os.Bundle
@@ -11,8 +11,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.edit
 import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
-import com.broadbandlifestyle.common.Constants.BASE_URL
-import com.broadbandlifestyle.customerapp.ShopActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
@@ -30,11 +28,11 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var passwordLayout: TextInputLayout
     private lateinit var btnLogin: MaterialButton
     private lateinit var progressBar: ProgressBar
-    private lateinit var apiService: DriverApiService
+    private lateinit var apiService: CommonApiService
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_login)
+        setContentView(getLayoutResourceId())
 
         initViews()
         setupRetrofit()
@@ -42,21 +40,29 @@ class LoginActivity : AppCompatActivity() {
         setupClickListeners()
     }
 
+    protected open fun getLayoutResourceId(): Int {
+        return getResourceId("activity_login", "layout")
+    }
+
+    private fun getResourceId(name: String, type: String): Int {
+        return resources.getIdentifier(name, type, packageName)
+    }
+
     private fun initViews() {
-        etEmail = findViewById(R.id.etEmail)
-        etPassword = findViewById(R.id.etPassword)
-        emailLayout = findViewById(R.id.emailLayout)
-        passwordLayout = findViewById(R.id.passwordLayout)
-        btnLogin = findViewById(R.id.btnLogin)
-        progressBar = findViewById(R.id.progressBar)
+        etEmail = findViewById(getResourceId("etEmail", "id"))
+        etPassword = findViewById(getResourceId("etPassword", "id"))
+        emailLayout = findViewById(getResourceId("emailLayout", "id"))
+        passwordLayout = findViewById(getResourceId("passwordLayout", "id"))
+        btnLogin = findViewById(getResourceId("btnLogin", "id"))
+        progressBar = findViewById(getResourceId("progressBar", "id"))
     }
 
     private fun setupRetrofit() {
         val retrofit = Retrofit.Builder()
-            .baseUrl(BASE_URL)
+            .baseUrl(Constants.BASE_URL)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
-        apiService = retrofit.create(DriverApiService::class.java)
+        apiService = retrofit.create(CommonApiService::class.java)
     }
 
     private fun setupTextWatchers() {
@@ -67,22 +73,24 @@ class LoginActivity : AppCompatActivity() {
     private fun setupClickListeners() {
         btnLogin.setOnClickListener { attemptLogin() }
 
-        findViewById<TextView>(R.id.tvForgotPassword).setOnClickListener {
+        val tvForgotPassword = findViewById<TextView>(getResourceId("tvForgotPassword", "id"))
+        tvForgotPassword?.setOnClickListener {
             try {
-                val intent = Intent(this, ForgotPasswordActivity::class.java)
+                val intent = Intent(this, Class.forName("com.broadbandlifestyle.driverapp.ForgotPasswordActivity"))
                 startActivity(intent)
             } catch (_: Exception) {
                 Toast.makeText(this, "Forgot Password screen not ready", Toast.LENGTH_SHORT).show()
             }
         }
 
-        findViewById<TextView>(R.id.tvRegister).setOnClickListener {
-            val intent = Intent(this, RegisterActivity::class.java)
-            startActivity(intent)
-        }
-
-        findViewById<View>(R.id.googleSignInButton).setOnClickListener {
-            Toast.makeText(this, "Google Sign-In coming soon", Toast.LENGTH_SHORT).show()
+        val tvRegister = findViewById<TextView>(getResourceId("tvRegister", "id"))
+        tvRegister?.setOnClickListener {
+            try {
+                val intent = Intent(this, Class.forName("com.broadbandlifestyle.driverapp.RegisterActivity"))
+                startActivity(intent)
+            } catch (_: Exception) {
+                Toast.makeText(this, "Register screen not ready", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -107,8 +115,8 @@ class LoginActivity : AppCompatActivity() {
                         val role = loginData.role?.trim()?.lowercase() ?: "user"
                         val userId = loginData.userId ?: -1
 
-                        saveUserData(userId, role)
-                        navigateToMainApp(role, userId)
+                        saveUserData(userId, role, loginData)
+                        navigateToMainApp(role, userId, loginData)
                     } else {
                         showError("Invalid login credentials")
                     }
@@ -142,28 +150,50 @@ class LoginActivity : AppCompatActivity() {
         return isValid
     }
 
-    private fun saveUserData(userId: Int, role: String) {
+    private fun saveUserData(userId: Int, role: String, loginData: LoginResponse) {
         val prefs = getSharedPreferences("user_prefs", MODE_PRIVATE)
         prefs.edit {
             putInt("USER_ID", userId)
             putString("USER_ROLE", role)
         }
-        if (role == "driver") {
-            getSharedPreferences("driver_prefs", MODE_PRIVATE).edit {
-                putBoolean("IS_ONLINE", true)
+
+        when (role) {
+            "driver" -> {
+                getSharedPreferences("driver_prefs", MODE_PRIVATE).edit {
+                    putBoolean("IS_ONLINE", true)
+                }
+            }
+            "restaurant staff", "restaurant_owner", "restaurant_staff" -> {
+                loginData.restaurantId?.let {
+                    getSharedPreferences("restaurant_prefs", MODE_PRIVATE).edit {
+                        putInt("RESTAURANT_ID", it)
+                        putString("RESTAURANT_NAME", loginData.restaurantName)
+                    }
+                }
             }
         }
     }
 
-    private fun navigateToMainApp(role: String, userId: Int) {
-        val intent = if (role == "driver") {
-            Intent(this, MainActivity::class.java).apply {
-                putExtra("DRIVER_ID", userId)
-                putExtra("START_SERVICE", true)
+    private fun navigateToMainApp(role: String, userId: Int, loginData: LoginResponse) {
+        val intent = when {
+            role == "driver" -> {
+                Intent(this, Class.forName("com.broadbandlifestyle.driverapp.MainActivity")).apply {
+                    putExtra("DRIVER_ID", userId)
+                    putExtra("START_SERVICE", true)
+                }
             }
-        } else {
-            Intent(this, ShopActivity::class.java)
+            role == "restaurant staff" || role == "restaurant_owner" || role == "restaurant_staff" -> {
+                Intent(this, Class.forName("com.broadbandlifestyle.restaurantapp.RestaurantDashboardActivity")).apply {
+                    putExtra("RESTAURANT_ID", loginData.restaurantId ?: -1)
+                    putExtra("RESTAURANT_NAME", loginData.restaurantName ?: "Restaurant")
+                    putExtra("USER_ID", userId)
+                }
+            }
+            else -> {
+                Intent(this, Class.forName("com.broadbandlifestyle.customerapp.ShopActivity"))
+            }
         }
+
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
         finish()

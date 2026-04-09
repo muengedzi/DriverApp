@@ -14,9 +14,12 @@ data class LoginResponse(
     val status: String?,
     @SerializedName("role") val role: String?,
     @SerializedName("driver_id") val driverId: Int?,
-    @SerializedName("full_name") val fullName: String?
+    @SerializedName("user_id") val remoteUserId: Int?,
+    @SerializedName("full_name") val fullName: String?,
+    @SerializedName("restaurant_id") val restaurantId: Int? = null,
+    @SerializedName("restaurant_name") val restaurantName: String? = null
 ) {
-    val userId: Int? get() = driverId
+    val userId: Int? get() = driverId ?: remoteUserId
 
     // Added for deep debugging
     override fun toString(): String {
@@ -253,4 +256,79 @@ data class SessionData(
     val active: Boolean,
     val start_time: String?,
     val online_minutes: Int
+)
+
+// ==================== RESTAURANT MODELS ====================
+
+data class RestaurantOrder(
+    val id: Int,
+    val order_number: String,
+    val status: String,
+    val created_at: String?,
+    val order_total: Double,
+    val delivery_fee: Double,
+    val platform_fee: Double,
+    val final_amount: Double,
+    val delivery_address: String?,
+    val instructions: String?,
+    val customer_name: String?,
+    val customer_phone: String?,
+    val item_count: Int
+)
+
+data class RestaurantOrdersResponse(
+    val active_orders: List<RestaurantOrder>,
+    val completed_orders: List<RestaurantCompletedOrder>
+)
+
+data class RestaurantCompletedOrder(
+    val id: Int,
+    val order_number: String,
+    val status: String,
+    val created_at: String?,
+    val completed_at: String?,
+    val final_amount: Double,
+    val item_count: Int
+)
+
+data class OrderDetailResponse(
+    val order: OrderDetail,
+    val items: List<OrderItem>
+)
+
+data class OrderDetail(
+    val id: Int,
+    val order_number: String,
+    val status: String,
+    val created_at: String?,
+    val order_total: Double,
+    val delivery_fee: Double,
+    val platform_fee: Double,
+    val final_amount: Double,
+    val delivery_address: String?,
+    val instructions: String?,
+    val customer_name: String?,
+    val customer_phone: String?
+)
+
+data class OrderItem(
+    val id: Int,
+    val name: String,
+    val quantity: Int,
+    val unit_price: Double,
+    val subtotal: Double,
+    val special_instructions: String?
+)
+
+data class RestaurantStats(
+    val today_orders: Int,
+    val today_revenue: Double,
+    val pending_orders: Int,
+    val preparing_orders: Int,
+    val ready_orders: Int
+)
+
+data class UpdateOrderStatusRequest(
+    val restaurant_id: Int,
+    val status: String
 )

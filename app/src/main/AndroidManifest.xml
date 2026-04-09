@@ -29,9 +29,9 @@
             android:name="com.google.android.geo.API_KEY"
             android:value="${MAPS_API_KEY}" />
 
-        <!-- Driver App Activities -->
+        <!-- Common Login Activity (Shared by all apps) -->
         <activity
-            android:name=".LoginActivity"
+            android:name="com.broadbandlifestyle.common.LoginActivity"
             android:exported="true"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
@@ -40,36 +40,37 @@
             </intent-filter>
         </activity>
 
+        <!-- Driver App Activities -->
         <activity
-            android:name=".MainActivity"
+            android:name="com.broadbandlifestyle.driverapp.MainActivity"
             android:exported="false"
             android:label="Driver Dashboard"
             android:screenOrientation="portrait" />
 
         <activity
-            android:name=".ProfileActivity"
+            android:name="com.broadbandlifestyle.driverapp.ProfileActivity"
             android:exported="false"
             android:label="My Profile"
             android:screenOrientation="portrait" />
 
         <activity
-            android:name=".EarningsActivity"
+            android:name="com.broadbandlifestyle.driverapp.EarningsActivity"
             android:exported="false"
             android:label="My Earnings"
             android:screenOrientation="portrait" />
 
         <activity
-            android:name=".HistoryActivity"
+            android:name="com.broadbandlifestyle.driverapp.HistoryActivity"
             android:exported="false"
             android:label="Order History"
             android:screenOrientation="portrait" />
 
         <activity
-            android:name=".RegisterActivity"
+            android:name="com.broadbandlifestyle.driverapp.RegisterActivity"
             android:exported="false" />
 
         <activity
-            android:name=".ForgotPasswordActivity"
+            android:name="com.broadbandlifestyle.driverapp.ForgotPasswordActivity"
             android:exported="false" />
 
         <!-- Customer App Activities -->
@@ -97,12 +98,28 @@
             android:label="Order Success"
             android:screenOrientation="portrait" />
 
+        <!-- Restaurant App Activities -->
+        <activity
+            android:name="com.broadbandlifestyle.restaurantapp.RestaurantDashboardActivity"
+            android:exported="false"
+            android:label="Restaurant Dashboard"
+            android:screenOrientation="portrait"
+            android:parentActivityName="com.broadbandlifestyle.common.LoginActivity" />
+
+        <activity
+            android:name="com.broadbandlifestyle.restaurantapp.OrderDetailActivity"
+            android:exported="false"
+            android:label="Order Details"
+            android:screenOrientation="portrait"
+            android:parentActivityName="com.broadbandlifestyle.restaurantapp.RestaurantDashboardActivity" />
+
         <!-- Foreground Service for Driver Location Tracking -->
         <service
-            android:name=".OrderForegroundService"
+            android:name="com.broadbandlifestyle.driverapp.OrderForegroundService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="location" />
 
     </application>
+
 </manifest>

@@ -7,9 +7,6 @@ import retrofit2.http.*
 interface DriverApiService {
 
     // 1. AUTHENTICATION
-    @POST("login_mobile")
-    suspend fun login(@Body credentials: Map<String, String>): Response<LoginResponse>
-
     @POST("mobile/driver/logout")
     suspend fun driverLogout(@Body driverIdMap: Map<String, Int>): Response<GenericResponse>
 

@@ -31,9 +31,6 @@ data class TrackingData(
 // ==================== INTERFACE ====================
 interface CustomerApiService {
 
-    @POST("login_mobile")
-    suspend fun login(@Body credentials: Map<String, String>): Response<LoginResponse>
-
     @POST("mobile/customer/register")
     suspend fun register(@Body details: Map<String, String>): Response<GenericResponse>
 

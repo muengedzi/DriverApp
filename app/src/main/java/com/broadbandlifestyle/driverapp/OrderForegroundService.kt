@@ -13,6 +13,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.broadbandlifestyle.common.Constants.BASE_URL
 import com.broadbandlifestyle.common.LocationUpdateRequest
+import com.broadbandlifestyle.common.LoginActivity
 import com.google.android.gms.location.*
 import kotlinx.coroutines.*
 import retrofit2.Retrofit

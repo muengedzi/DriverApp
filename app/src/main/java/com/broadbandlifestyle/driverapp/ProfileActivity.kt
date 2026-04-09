@@ -21,6 +21,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.broadbandlifestyle.common.Constants.BASE_URL
+import com.broadbandlifestyle.common.LoginActivity
 import com.broadbandlifestyle.common.UpdateProfileRequest
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices

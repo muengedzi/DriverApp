@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 import com.broadbandlifestyle.common.CartManager
 import com.broadbandlifestyle.common.Product
@@ -63,11 +64,15 @@ class CartAdapter(
             holder.tvQty.text = qty.toString()
 
             holder.btnPlus.setOnClickListener {
-                updateRunnable?.let { handler.removeCallbacks(it) }
-                CartManager.addItem(product)
-                notifyItemChanged(position)
-                updateRunnable = Runnable { onCartChanged?.invoke() }
-                handler.postDelayed(updateRunnable!!, 500)
+                if (qty < product.stockQuantity) {
+                    updateRunnable?.let { handler.removeCallbacks(it) }
+                    CartManager.addItem(product)
+                    notifyItemChanged(position)
+                    updateRunnable = Runnable { onCartChanged?.invoke() }
+                    handler.postDelayed(updateRunnable!!, 500)
+                } else {
+                    Toast.makeText(holder.itemView.context, "Cannot add more. Only ${product.stockQuantity} items in stock.", Toast.LENGTH_SHORT).show()
+                }
             }
 
             holder.btnMinus.setOnClickListener {

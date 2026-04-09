@@ -15,11 +15,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import com.broadbandlifestyle.common.CartManager
 import com.broadbandlifestyle.common.Constants.BASE_URL
 import com.broadbandlifestyle.common.Product
-import com.broadbandlifestyle.driverapp.ProductAdapter
 import com.broadbandlifestyle.driverapp.R
-
-// 1. THIS IS CRITICAL: Ensure this matches your project folder structure
-import com.broadbandlifestyle.customerapp.CartActivity
 
 class ShopActivity : AppCompatActivity() {
 
@@ -47,7 +43,6 @@ class ShopActivity : AppCompatActivity() {
 
         fabCheckout.setOnClickListener {
             if (CartManager.getCartCount() > 0) {
-                // 2. THIS SYNTAX FIXES THE "TYPE PARAMETER T" ERROR
                 val intent = Intent(this@ShopActivity, CartActivity::class.java)
                 startActivity(intent)
             } else {
@@ -65,7 +60,6 @@ class ShopActivity : AppCompatActivity() {
 
                 if (response.isSuccessful) {
                     val productList: List<Product> = response.body() ?: emptyList()
-                    // 3. This matches the new ProductAdapter constructor
                     rvProducts.adapter = ProductAdapter(productList) {
                         updateCartFab()
                     }
@@ -81,7 +75,6 @@ class ShopActivity : AppCompatActivity() {
         updateCartFab()
     }
 
-    // Changed to public so it can be accessed if needed, though callback is better
     fun updateCartFab() {
         val count = CartManager.getCartCount()
         fabCheckout.text = if (count > 0) "Checkout ($count)" else "Checkout"
