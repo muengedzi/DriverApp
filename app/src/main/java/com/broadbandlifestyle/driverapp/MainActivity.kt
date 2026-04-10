@@ -16,7 +16,6 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
@@ -24,7 +23,6 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.broadbandlifestyle.common.*
 import com.broadbandlifestyle.common.Constants.BASE_URL
 import com.broadbandlifestyle.common.LoginActivity
-import com.google.android.material.bottomnavigation.BottomNavigationView
 import kotlinx.coroutines.*
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -39,7 +37,6 @@ import android.os.Vibrator
 class MainActivity : AppCompatActivity() {
 
     private lateinit var apiService: DriverApiService
-    private lateinit var bottomNav: BottomNavigationView
     private lateinit var toolbar: Toolbar
     private lateinit var swipeRefresh: SwipeRefreshLayout
     private lateinit var txtWelcomeName: TextView
@@ -65,7 +62,7 @@ class MainActivity : AppCompatActivity() {
     private val pollRunnable = object : Runnable {
         override fun run() {
             refreshOrderData()
-            mainHandler.postDelayed(this, 10000) // Poll every 10 seconds
+            mainHandler.postDelayed(this, 10000)
         }
     }
 
@@ -80,8 +77,8 @@ class MainActivity : AppCompatActivity() {
         setupRetrofit()
         createNotificationChannel()
         refreshAllData()
+        setupCapsuleNavigation()
 
-        // Start polling for orders
         mainHandler.post(pollRunnable)
     }
 
@@ -109,7 +106,6 @@ class MainActivity : AppCompatActivity() {
         setSupportActionBar(toolbar)
         supportActionBar?.setDisplayShowTitleEnabled(false)
 
-        bottomNav = findViewById(R.id.bottomNavigation)
         swipeRefresh = findViewById(R.id.swipeRefresh)
         txtWelcomeName = findViewById(R.id.txtWelcomeName)
         txtOnlineStatus = findViewById(R.id.txtOnlineStatus)
@@ -120,17 +116,6 @@ class MainActivity : AppCompatActivity() {
         btnNavigate = findViewById(R.id.btnNavigate)
         btnDelivered = findViewById(R.id.btnDelivered)
         btnPickedUp = findViewById(R.id.btnPickedUp)
-
-        // Bottom Navigation Logic
-        bottomNav.setOnItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_dashboard -> { /* Already here */ }
-                R.id.nav_earnings -> startActivity(Intent(this, EarningsActivity::class.java))
-                R.id.nav_history -> startActivity(Intent(this, HistoryActivity::class.java))
-                R.id.nav_profile -> startActivity(Intent(this, ProfileActivity::class.java))
-            }
-            true
-        }
 
         swipeRefresh.setOnRefreshListener { refreshAllData() }
 
@@ -158,6 +143,34 @@ class MainActivity : AppCompatActivity() {
                 completeOrder(currentOrderId)
             }
         }
+    }
+
+    private fun setupCapsuleNavigation() {
+        CapsuleNavigationHelper.setupCapsuleNavigation(
+            activity = this,
+            menuResId = R.menu.bottom_nav_menu_driver,
+            onItemSelected = { itemId ->
+                when (itemId) {
+                    R.id.nav_dashboard -> {
+                        // Already on dashboard
+                        true
+                    }
+                    R.id.nav_earnings -> {
+                        startActivity(Intent(this, EarningsActivity::class.java))
+                        true
+                    }
+                    R.id.nav_history -> {
+                        startActivity(Intent(this, HistoryActivity::class.java))
+                        true
+                    }
+                    R.id.nav_profile -> {
+                        startActivity(Intent(this, ProfileActivity::class.java))
+                        true
+                    }
+                    else -> false
+                }
+            }
+        )
     }
 
     private fun setupRetrofit() {
@@ -201,17 +214,14 @@ class MainActivity : AppCompatActivity() {
                             currentOrder = order
 
                             if (!order.isOffer) {
-                                // Active delivery
                                 displayActiveOrder(order)
                             } else {
-                                // Offer - show dialog
                                 if (order.id != lastNotifiedOrderId && !isShowingOfferDialog) {
                                     lastNotifiedOrderId = order.id
                                     showOrderOfferDialog(order)
                                 }
                             }
                         } else {
-                            // No orders
                             txtOrderInfo.text = "No active orders\n\nWaiting for offers..."
                             layoutTransitControls.visibility = View.GONE
                             currentOrderId = -1

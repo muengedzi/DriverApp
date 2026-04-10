@@ -1,289 +1,67 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.drawerlayout.widget.DrawerLayout
+<androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/drawerLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F3F6F8"
-    android:fitsSystemWindows="true">
+    android:background="#F8F9FA">
 
-    <LinearLayout
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical">
+        android:layout_height="wrap_content"
+        android:background="@android:color/transparent"
+        app:elevation="0dp"
+        app:layout_constraintTop_toTopOf="parent">
 
-        <androidx.appcompat.widget.Toolbar
+        <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="#2E7D32"
-            android:elevation="6dp"
+            android:background="@android:color/white"
             app:title="Restaurant Dashboard"
-            app:titleTextColor="#FFFFFF"/>
+            app:titleCentered="true"
+            app:titleTextAppearance="@style/TextAppearance.Material3.TitleMedium"/>
+    </com.google.android.material.appbar.AppBarLayout>
 
-        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-            android:id="@+id/swipeRefresh"
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipeRefresh"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toBottomOf="@id/appBarLayout"
+        app:layout_constraintBottom_toTopOf="@id/capsuleNavContainer">
+
+        <androidx.core.widget.NestedScrollView
             android:layout_width="match_parent"
-            android:layout_height="match_parent">
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:paddingBottom="80dp">
 
-            <ScrollView
+            <LinearLayout
+                android:id="@+id/mainContent"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:fillViewport="true">
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp" />
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
+        </androidx.core.widget.NestedScrollView>
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
-                    <!-- Restaurant Name -->
-                    <TextView
-                        android:id="@+id/txtRestaurantName"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="Restaurant Name"
-                        android:textSize="24sp"
-                        android:textStyle="bold"
-                        android:textColor="#1B5E20"
-                        android:layout_marginBottom="16dp"/>
+    <!-- Floating Capsule Navigation Container -->
+    <FrameLayout
+        android:id="@+id/capsuleNavContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:clickable="true"
+        app:layout_constraintBottom_toBottomOf="parent">
 
-                    <!-- Stats Cards Row -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:layout_marginBottom="20dp">
+        <include
+            layout="@layout/layout_capsule_navigation"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom" />
 
-                        <androidx.cardview.widget.CardView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginEnd="8dp"
-                            app:cardCornerRadius="16dp"
-                            app:cardElevation="4dp"
-                            android:background="#FFFFFF">
+    </FrameLayout>
 
-                            <LinearLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:orientation="vertical"
-                                android:padding="16dp"
-                                android:gravity="center">
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="Today's Orders"
-                                    android:textSize="12sp"
-                                    android:textColor="#757575"/>
-
-                                <TextView
-                                    android:id="@+id/txtTodayOrders"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="0"
-                                    android:textSize="28sp"
-                                    android:textStyle="bold"
-                                    android:textColor="#2E7D32"
-                                    android:layout_marginTop="4dp"/>
-                            </LinearLayout>
-                        </androidx.cardview.widget.CardView>
-
-                        <androidx.cardview.widget.CardView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginStart="8dp"
-                            app:cardCornerRadius="16dp"
-                            app:cardElevation="4dp"
-                            android:background="#FFFFFF">
-
-                            <LinearLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:orientation="vertical"
-                                android:padding="16dp"
-                                android:gravity="center">
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="Today's Revenue"
-                                    android:textSize="12sp"
-                                    android:textColor="#757575"/>
-
-                                <TextView
-                                    android:id="@+id/txtTodayRevenue"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="R0.00"
-                                    android:textSize="28sp"
-                                    android:textStyle="bold"
-                                    android:textColor="#1976D2"
-                                    android:layout_marginTop="4dp"/>
-                            </LinearLayout>
-                        </androidx.cardview.widget.CardView>
-                    </LinearLayout>
-
-                    <!-- Status Cards Row -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:layout_marginBottom="24dp">
-
-                        <androidx.cardview.widget.CardView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginEnd="4dp"
-                            app:cardCornerRadius="12dp"
-                            app:cardElevation="2dp">
-
-                            <LinearLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:orientation="vertical"
-                                android:padding="12dp"
-                                android:gravity="center">
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="Pending"
-                                    android:textSize="11sp"
-                                    android:textColor="#FF9800"/>
-
-                                <TextView
-                                    android:id="@+id/txtPendingOrders"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="0"
-                                    android:textSize="18sp"
-                                    android:textStyle="bold"
-                                    android:textColor="#FF9800"/>
-                            </LinearLayout>
-                        </androidx.cardview.widget.CardView>
-
-                        <androidx.cardview.widget.CardView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginStart="4dp"
-                            android:layout_marginEnd="4dp"
-                            app:cardCornerRadius="12dp"
-                            app:cardElevation="2dp">
-
-                            <LinearLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:orientation="vertical"
-                                android:padding="12dp"
-                                android:gravity="center">
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="Preparing"
-                                    android:textSize="11sp"
-                                    android:textColor="#2196F3"/>
-
-                                <TextView
-                                    android:id="@+id/txtPreparingOrders"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="0"
-                                    android:textSize="18sp"
-                                    android:textStyle="bold"
-                                    android:textColor="#2196F3"/>
-                            </LinearLayout>
-                        </androidx.cardview.widget.CardView>
-
-                        <androidx.cardview.widget.CardView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginStart="4dp"
-                            app:cardCornerRadius="12dp"
-                            app:cardElevation="2dp">
-
-                            <LinearLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:orientation="vertical"
-                                android:padding="12dp"
-                                android:gravity="center">
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="Ready"
-                                    android:textSize="11sp"
-                                    android:textColor="#4CAF50"/>
-
-                                <TextView
-                                    android:id="@+id/txtReadyOrders"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="0"
-                                    android:textSize="18sp"
-                                    android:textStyle="bold"
-                                    android:textColor="#4CAF50"/>
-                            </LinearLayout>
-                        </androidx.cardview.widget.CardView>
-                    </LinearLayout>
-
-                    <!-- Active Orders Section -->
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="Active Orders"
-                        android:textStyle="bold"
-                        android:textSize="18sp"
-                        android:textColor="#333333"
-                        android:layout_marginBottom="12dp"/>
-
-                    <!-- Progress Bar -->
-                    <ProgressBar
-                        android:id="@+id/progressBar"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="center"
-                        android:layout_marginTop="32dp"
-                        android:visibility="gone"/>
-
-                    <!-- Empty State -->
-                    <TextView
-                        android:id="@+id/txtEmptyState"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="No active orders"
-                        android:textSize="16sp"
-                        android:textColor="#757575"
-                        android:gravity="center"
-                        android:layout_marginTop="32dp"
-                        android:visibility="gone"/>
-
-                    <!-- Orders RecyclerView -->
-                    <androidx.recyclerview.widget.RecyclerView
-                        android:id="@+id/recyclerActiveOrders"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:nestedScrollingEnabled="false"/>
-
-                </LinearLayout>
-            </ScrollView>
-        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
-    </LinearLayout>
-
-    <com.google.android.material.navigation.NavigationView
-        android:id="@+id/navView"
-        android:layout_width="wrap_content"
-        android:layout_height="match_parent"
-        android:layout_gravity="start"
-        app:headerLayout="@layout/nav_header"
-        app:menu="@menu/drawer_menu"/>
-
-</androidx.drawerlayout.widget.DrawerLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,25 +1,21 @@
 package com.broadbandlifestyle.restaurantapp
 
 import android.content.Intent
-import android.graphics.Color
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
+import android.view.LayoutInflater
 import android.view.View
 import android.widget.*
-import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
-import androidx.core.view.GravityCompat
-import androidx.drawerlayout.widget.DrawerLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-import com.broadbandlifestyle.common.*
+import com.broadbandlifestyle.common.CapsuleNavigationHelper
 import com.broadbandlifestyle.common.Constants.BASE_URL
+import com.broadbandlifestyle.common.LoginActivity
+import com.broadbandlifestyle.common.RestaurantStats
 import com.broadbandlifestyle.driverapp.R
-import com.google.android.material.navigation.NavigationView
 import kotlinx.coroutines.*
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -32,39 +28,42 @@ class RestaurantDashboardActivity : AppCompatActivity() {
     private var userId: Int = -1
 
     // UI Elements
-    private lateinit var drawerLayout: DrawerLayout
-    private lateinit var navView: NavigationView
     private lateinit var toolbar: Toolbar
-    private lateinit var txtRestaurantName: TextView
-    private lateinit var txtTodayOrders: TextView
-    private lateinit var txtTodayRevenue: TextView
-    private lateinit var txtPendingOrders: TextView
-    private lateinit var txtPreparingOrders: TextView
-    private lateinit var txtReadyOrders: TextView
-    private lateinit var recyclerActiveOrders: RecyclerView
     private lateinit var swipeRefresh: SwipeRefreshLayout
-    private lateinit var progressBar: ProgressBar
-    private lateinit var txtEmptyState: TextView
+    private lateinit var mainContent: LinearLayout
 
+    // Dashboard views
+    private var txtRestaurantName: TextView? = null
+    private var txtTodayOrders: TextView? = null
+    private var txtTodayRevenue: TextView? = null
+    private var txtPendingOrders: TextView? = null
+    private var txtPreparingOrders: TextView? = null
+    private var txtReadyOrders: TextView? = null
+
+    // Orders views
+    private var recyclerActiveOrders: RecyclerView? = null
+    private var progressBar: ProgressBar? = null
+    private var txtEmptyState: TextView? = null
     private lateinit var ordersAdapter: RestaurantOrdersAdapter
-    private val mainHandler = Handler(Looper.getMainLooper())
-    private var pollRunnable: Runnable? = null
+
+    private var currentTab = "dashboard"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_restaurant_dashboard)
 
-        // Get data from intent
+        // 1. Get data from intent first
         restaurantId = intent.getIntExtra("RESTAURANT_ID", -1)
-        restaurantName = intent.getStringExtra("RESTAURANT_NAME") ?: "Restaurant"
+        restaurantName = intent.getStringExtra("RESTAURANT_NAME") ?: ""
         userId = intent.getIntExtra("USER_ID", -1)
 
-        // If not from intent, try shared preferences
+        // 2. Fallback to prefs if needed
         if (restaurantId == -1) {
             val prefs = getSharedPreferences("restaurant_prefs", MODE_PRIVATE)
-            // Fix the key name here:
             restaurantId = prefs.getInt("RESTAURANT_ID", -1)
-            restaurantName = prefs.getString("RESTAURANT_NAME", "Restaurant") ?: "Restaurant"
+            if (restaurantName.isEmpty()) {
+                restaurantName = prefs.getString("RESTAURANT_NAME", "Restaurant") ?: "Restaurant"
+            }
         }
 
         if (restaurantId == -1) {
@@ -75,66 +74,100 @@ class RestaurantDashboardActivity : AppCompatActivity() {
         }
 
         initializeViews()
-        setupToolbarAndNavigation()
+        setupToolbar()
+        setupCapsuleNavigation()
         setupRetrofit()
-        setupRecyclerView()
-        loadStats()
-        loadOrders()
 
-        // Start polling for new orders every 10 seconds
-        startPolling()
+        // Initialize adapter once
+        ordersAdapter = RestaurantOrdersAdapter { order ->
+            val intent = Intent(this, OrderDetailActivity::class.java)
+            intent.putExtra("ORDER_ID", order.id)
+            intent.putExtra("RESTAURANT_ID", restaurantId)
+            startActivity(intent)
+        }
+
+        // Load dashboard by default
+        showDashboard()
+        loadStats()
     }
 
     private fun initializeViews() {
         toolbar = findViewById(R.id.toolbar)
-        drawerLayout = findViewById(R.id.drawerLayout)
-        navView = findViewById(R.id.navView)
-        txtRestaurantName = findViewById(R.id.txtRestaurantName)
-        txtTodayOrders = findViewById(R.id.txtTodayOrders)
-        txtTodayRevenue = findViewById(R.id.txtTodayRevenue)
-        txtPendingOrders = findViewById(R.id.txtPendingOrders)
-        txtPreparingOrders = findViewById(R.id.txtPreparingOrders)
-        txtReadyOrders = findViewById(R.id.txtReadyOrders)
-        recyclerActiveOrders = findViewById(R.id.recyclerActiveOrders)
         swipeRefresh = findViewById(R.id.swipeRefresh)
-        progressBar = findViewById(R.id.progressBar)
-        txtEmptyState = findViewById(R.id.txtEmptyState)
+        mainContent = findViewById(R.id.mainContent)
 
-        txtRestaurantName.text = restaurantName
+        swipeRefresh.setOnRefreshListener {
+            when (currentTab) {
+                "dashboard" -> loadStats()
+                "orders" -> loadOrders()
+            }
+        }
     }
 
-    private fun setupToolbarAndNavigation() {
+    private fun setupToolbar() {
         setSupportActionBar(toolbar)
         supportActionBar?.setDisplayShowTitleEnabled(false)
-
-        val toggle = ActionBarDrawerToggle(
-            this, drawerLayout, toolbar,
-            R.string.open, R.string.close
-        )
-        drawerLayout.addDrawerListener(toggle)
-        toggle.syncState()
-        toggle.drawerArrowDrawable.color = Color.WHITE
-
-        setupNavigationMenu()
+        toolbar.title = restaurantName
     }
 
-    private fun setupNavigationMenu() {
-        navView.setNavigationItemSelectedListener { menuItem ->
-            when (menuItem.itemId) {
-                R.id.nav_logout -> {
-                    showLogoutConfirmation()
+    private fun setupCapsuleNavigation() {
+        CapsuleNavigationHelper.setupCapsuleNavigation(
+            activity = this,
+            menuResId = R.menu.bottom_nav_menu_restaurant,
+            onItemSelected = { itemId ->
+                when (itemId) {
+                    R.id.nav_dashboard -> {
+                        currentTab = "dashboard"
+                        showDashboard()
+                        loadStats()
+                        true
+                    }
+                    R.id.nav_active_orders -> {
+                        currentTab = "orders"
+                        showActiveOrders()
+                        loadOrders()
+                        true
+                    }
+                    R.id.nav_history -> {
+                        Toast.makeText(this, "Order History - Coming Soon", Toast.LENGTH_SHORT).show()
+                        true
+                    }
+                    R.id.nav_profile -> {
+                        Toast.makeText(this, "Profile - Coming Soon", Toast.LENGTH_SHORT).show()
+                        true
+                    }
+                    else -> false
                 }
             }
-            drawerLayout.closeDrawer(GravityCompat.START)
-            true
-        }
+        )
+    }
 
-        // Update navigation header with restaurant name
-        val headerView = navView.getHeaderView(0)
-        val navHeaderName = headerView.findViewById<TextView>(R.id.navHeaderName)
-        val navHeaderStatus = headerView.findViewById<TextView>(R.id.navHeaderStatus)
-        navHeaderName.text = restaurantName
-        navHeaderStatus.text = "Restaurant Staff"
+    private fun showDashboard() {
+        mainContent.removeAllViews()
+        val dashboardView = layoutInflater.inflate(R.layout.content_dashboard, mainContent, false)
+        mainContent.addView(dashboardView)
+
+        txtRestaurantName = dashboardView.findViewById(R.id.txtRestaurantName)
+        txtTodayOrders = dashboardView.findViewById(R.id.txtTodayOrders)
+        txtTodayRevenue = dashboardView.findViewById(R.id.txtTodayRevenue)
+        txtPendingOrders = dashboardView.findViewById(R.id.txtPendingOrders)
+        txtPreparingOrders = dashboardView.findViewById(R.id.txtPreparingOrders)
+        txtReadyOrders = dashboardView.findViewById(R.id.txtReadyOrders)
+
+        txtRestaurantName?.text = restaurantName
+    }
+
+    private fun showActiveOrders() {
+        mainContent.removeAllViews()
+        val ordersView = layoutInflater.inflate(R.layout.content_active_orders, mainContent, false)
+        mainContent.addView(ordersView)
+
+        recyclerActiveOrders = ordersView.findViewById(R.id.recyclerActiveOrders)
+        progressBar = ordersView.findViewById(R.id.progressBar)
+        txtEmptyState = ordersView.findViewById(R.id.txtEmptyState)
+
+        recyclerActiveOrders?.layoutManager = LinearLayoutManager(this)
+        recyclerActiveOrders?.adapter = ordersAdapter
     }
 
     private fun setupRetrofit() {
@@ -143,27 +176,6 @@ class RestaurantDashboardActivity : AppCompatActivity() {
             .addConverterFactory(GsonConverterFactory.create())
             .build()
         apiService = retrofit.create(RestaurantApiService::class.java)
-    }
-
-    private fun setupRecyclerView() {
-        ordersAdapter = RestaurantOrdersAdapter { order ->
-            val intent = Intent(this, OrderDetailActivity::class.java)
-            intent.putExtra("ORDER_ID", order.id)
-            intent.putExtra("RESTAURANT_ID", restaurantId)
-            startActivity(intent)
-        }
-        recyclerActiveOrders.layoutManager = LinearLayoutManager(this)
-        recyclerActiveOrders.adapter = ordersAdapter
-    }
-
-    private fun startPolling() {
-        pollRunnable = object : Runnable {
-            override fun run() {
-                loadOrders()
-                mainHandler.postDelayed(this, 10000)
-            }
-        }
-        mainHandler.post(pollRunnable!!)
     }
 
     private fun loadStats() {
@@ -175,39 +187,44 @@ class RestaurantDashboardActivity : AppCompatActivity() {
                         val stats = response.body()
                         stats?.let { updateStatsUI(it) }
                     }
+                    swipeRefresh.isRefreshing = false
                 }
             } catch (e: Exception) {
-                // Silent fail - stats will update on next refresh
+                withContext(Dispatchers.Main) {
+                    swipeRefresh.isRefreshing = false
+                }
             }
         }
     }
 
     private fun updateStatsUI(stats: RestaurantStats) {
-        txtTodayOrders.text = stats.today_orders.toString()
-        txtTodayRevenue.text = "R${String.format("%.2f", stats.today_revenue)}"
-        txtPendingOrders.text = stats.pending_orders.toString()
-        txtPreparingOrders.text = stats.preparing_orders.toString()
-        txtReadyOrders.text = stats.ready_orders.toString()
+        txtTodayOrders?.text = stats.today_orders.toString()
+        txtTodayRevenue?.text = "R${String.format("%.2f", stats.today_revenue)}"
+        txtPendingOrders?.text = stats.pending_orders.toString()
+        txtPreparingOrders?.text = stats.preparing_orders.toString()
+        txtReadyOrders?.text = stats.ready_orders.toString()
     }
 
     private fun loadOrders() {
+        progressBar?.visibility = View.VISIBLE
+
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val response = apiService.getOrders(restaurantId)
                 withContext(Dispatchers.Main) {
-                    progressBar.visibility = View.GONE
+                    progressBar?.visibility = View.GONE
                     swipeRefresh.isRefreshing = false
 
                     if (response.isSuccessful) {
                         val data = response.body()
                         if (data != null && data.active_orders.isNotEmpty()) {
-                            txtEmptyState.visibility = View.GONE
-                            recyclerActiveOrders.visibility = View.VISIBLE
+                            txtEmptyState?.visibility = View.GONE
+                            recyclerActiveOrders?.visibility = View.VISIBLE
                             ordersAdapter.submitList(data.active_orders)
                         } else {
-                            txtEmptyState.visibility = View.VISIBLE
-                            recyclerActiveOrders.visibility = View.GONE
-                            txtEmptyState.text = "No active orders"
+                            txtEmptyState?.visibility = View.VISIBLE
+                            recyclerActiveOrders?.visibility = View.GONE
+                            txtEmptyState?.text = "No active orders"
                         }
                     } else {
                         showError("Failed to load orders")
@@ -215,7 +232,7 @@ class RestaurantDashboardActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    progressBar.visibility = View.GONE
+                    progressBar?.visibility = View.GONE
                     swipeRefresh.isRefreshing = false
                     showError("Network error: ${e.message}")
                 }
@@ -224,9 +241,9 @@ class RestaurantDashboardActivity : AppCompatActivity() {
     }
 
     private fun showError(message: String) {
-        txtEmptyState.visibility = View.VISIBLE
-        txtEmptyState.text = message
-        recyclerActiveOrders.visibility = View.GONE
+        txtEmptyState?.visibility = View.VISIBLE
+        txtEmptyState?.text = message
+        recyclerActiveOrders?.visibility = View.GONE
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
@@ -241,10 +258,5 @@ class RestaurantDashboardActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cancel", null)
             .show()
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        pollRunnable?.let { mainHandler.removeCallbacks(it) }
     }
 }

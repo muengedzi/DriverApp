@@ -10,11 +10,10 @@ import com.google.android.material.floatingactionbutton.ExtendedFloatingActionBu
 import kotlinx.coroutines.*
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-
-// Core Imports
 import com.broadbandlifestyle.common.CartManager
 import com.broadbandlifestyle.common.Constants.BASE_URL
 import com.broadbandlifestyle.common.Product
+import com.broadbandlifestyle.common.CapsuleNavigationHelper
 import com.broadbandlifestyle.driverapp.R
 
 class ShopActivity : AppCompatActivity() {
@@ -40,6 +39,7 @@ class ShopActivity : AppCompatActivity() {
         apiService = retrofit.create(CustomerApiService::class.java)
 
         loadProducts()
+        setupCapsuleNavigation()
 
         fabCheckout.setOnClickListener {
             if (CartManager.getCartCount() > 0) {
@@ -49,6 +49,38 @@ class ShopActivity : AppCompatActivity() {
                 Toast.makeText(this, "Your cart is empty!", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    private fun setupCapsuleNavigation() {
+        CapsuleNavigationHelper.setupCapsuleNavigation(
+            activity = this,
+            menuResId = R.menu.bottom_nav_menu_customer,
+            onItemSelected = { itemId ->
+                when (itemId) {
+                    R.id.nav_shop -> {
+                        // Already on shop
+                        true
+                    }
+                    R.id.nav_cart -> {
+                        if (CartManager.getCartCount() > 0) {
+                            startActivity(Intent(this, CartActivity::class.java))
+                        } else {
+                            Toast.makeText(this, "Your cart is empty!", Toast.LENGTH_SHORT).show()
+                        }
+                        true
+                    }
+                    R.id.nav_orders -> {
+                        Toast.makeText(this, "Order History - Coming Soon", Toast.LENGTH_SHORT).show()
+                        true
+                    }
+                    R.id.nav_profile -> {
+                        Toast.makeText(this, "Profile - Coming Soon", Toast.LENGTH_SHORT).show()
+                        true
+                    }
+                    else -> false
+                }
+            }
+        )
     }
 
     private fun loadProducts() {
